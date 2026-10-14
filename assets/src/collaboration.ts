@@ -1,5 +1,6 @@
 import type { LexicalEditor } from "lexical";
 import type { ExtensionAPI } from "./extensions";
+import type { SubmitParticipant } from "./forms";
 
 export interface CollabCredentials {
   document_id: string;
@@ -7,11 +8,17 @@ export interface CollabCredentials {
   socket: string;
   role: "read" | "write";
   user: { id: string; name: string; color: string };
+  /** "visible": join while on screen, focused or sending; leave after `park_after` ms off screen and idle. */
+  join?: "eager" | "visible";
+  park_after?: number;
 }
 
-export interface Collaboration {
+/** A shared editor's client; its form's submit coordinator flushes and locks it. */
+export interface Collaboration extends SubmitParticipant {
   readonly: boolean;
   flush(): Promise<{ epoch: string; revision: number }>;
+  /** Resolves after the first join (joining now if needed): the editor holds the shared document. */
+  whenJoined(): Promise<void>;
   updateCredentials(credentials: CollabCredentials): void;
   dispose(): void;
 }
@@ -44,6 +51,6 @@ export function attachCollaboration(host: CollaborationHost): Promise<Collaborat
 export function readCollabCredentials(json: string | undefined): CollabCredentials | null {
   if (!json) return null;
   const data = JSON.parse(json) as CollabCredentials;
-  if (!data || typeof data.document_id !== "string" || typeof data.token !== "string" || typeof data.socket !== "string" || !["read", "write"].includes(data.role) || typeof data.user?.id !== "string") throw new Error("Invalid Kotoba collaboration credentials");
+  if (!data || typeof data.document_id !== "string" || typeof data.token !== "string" || typeof data.socket !== "string" || !["read", "write"].includes(data.role) || typeof data.user?.id !== "string" || !["eager", "visible", undefined].includes(data.join) || !["number", "undefined"].includes(typeof data.park_after)) throw new Error("Invalid Kotoba collaboration credentials");
   return data;
 }

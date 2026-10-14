@@ -40,6 +40,30 @@ defmodule Kotoba.Collab.ChannelTest do
   defp join_params(role),
     do: %{"token" => credentials(role)["token"], "session" => "alice:session", "pending" => []}
 
+  test "credentials name the join mode only when the editor joins on visibility" do
+    refute Map.has_key?(credentials(:write), "join")
+
+    visible =
+      Kotoba.Collab.token(@endpoint, "shared", user: %{id: "alice"}, join: :visible)
+
+    assert %{"join" => "visible", "park_after" => 30_000} = visible
+
+    assert %{"park_after" => 5} =
+             Kotoba.Collab.token(@endpoint, "shared",
+               user: %{id: "alice"},
+               join: :visible,
+               park_after: 5
+             )
+
+    assert_raise ArgumentError, fn ->
+      Kotoba.Collab.token(@endpoint, "shared", user: %{id: "alice"}, join: :focus)
+    end
+
+    assert_raise ArgumentError, fn ->
+      Kotoba.Collab.token(@endpoint, "shared", user: %{id: "alice"}, park_after: 0)
+    end
+  end
+
   test "signed credentials are document scoped and checked against application access", %{
     socket: socket,
     access: access

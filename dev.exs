@@ -1019,55 +1019,155 @@ end
 defmodule KotobaDev.ManyCollabLive do
   @moduledoc false
   # Many shared editors on one page, as in a document of many text blocks:
-  # /collab/many?document=ID&count=20&name=Ada.
+  # /collab/many?document=ID&count=20&name=Ada&join=visible&park_after=500.
   use Phoenix.LiveView
   import Kotoba.Components
+
+  # Nested (KotobaDev.NestedCollabLive): the page's query comes in the session.
+  def mount(:not_mounted_at_router, %{"params" => params}, socket), do: mount(params, %{}, socket)
 
   def mount(params, _session, socket) do
     prefix = Map.get(params, "document", "many")
     count = params |> Map.get("count", "20") |> String.to_integer() |> min(50)
     name = Map.get(params, "name", "Ada")
     user = %{id: name, name: name}
+    opts = join_options(params)
     ids = Enum.map(1..count, &"#{prefix}-#{&1}")
-    # ?repeat=1: a last editor of the first editor's document.
-    editors = if params["repeat"], do: ids ++ [hd(ids)], else: ids
+    # ?repeat=1: a last editor of the first editor's document. ?nodes=N: editor N loads a node
+    # module (a test can hold it back).
+    # Each editor is {document id, number}; the number makes its DOM id and stays when another
+    # editor goes.
+    editors = Enum.with_index(ids, 1)
+    editors = if params["repeat"], do: editors ++ [{hd(ids), count + 1}], else: editors
 
     {:ok,
      assign(socket,
+       prefix: prefix,
+       badcollab: params["badcollab"],
        ids: ids,
        editors: editors,
+       nodes: params |> Map.get("nodes", "0") |> String.to_integer(),
+       # ?deny=1: renewals are refused, as when access was taken away.
+       deny: Map.has_key?(params, "deny"),
+       # ?required=1: a required field, which the browser checks before it submits.
+       required: Map.has_key?(params, "required"),
+       # ?scroller=1: the editors scroll in a box low on the page, not with the page;
+       # ?scroller=x: a short box that clips only across.
+       scroller: params["scroller"],
        user: user,
-       collab: Map.new(ids, &{&1, Kotoba.Collab.token(socket, &1, user: user)}),
-       form: to_form(%{}, as: :many),
+       opts: opts,
+       # ?badcollab=N: editor N's credentials cannot be read (no token).
+       collab:
+         Map.new(ids, &{&1, Kotoba.Collab.token(socket, &1, [user: user] ++ opts)})
+         |> bad_credentials(params["badcollab"], prefix),
+       # ?text=1: each field holds a saved text, as an app's stored content.
+       form: to_form(saved_texts(params, editors), as: :many),
        saved: nil
      )}
   end
+
+  defp join_options(%{"join" => "visible"} = params),
+    do: [
+      join: :visible,
+      park_after: params |> Map.get("park_after", "30000") |> String.to_integer()
+    ]
+
+  defp join_options(_params), do: []
 
   def render(assigns) do
     ~H"""
     <h1>Many shared editors</h1>
     <.form for={@form} id="many-form" phx-submit="save">
       <button type="submit" id="many-save">Publish accepted revisions</button>
-      <div :for={{id, index} <- Enum.with_index(@editors, 1)} style="min-height: 60vh">
-        <.kotoba field={@form["body_#{index}"]} id={"editor_#{index}"} label={"Block #{index}"} collab={@collab[id]} />
+      <input :if={@required} id="many-required" name="required" value="x" required />
+      <div
+        id="many-scroller"
+        style={
+          case @scroller do
+            "1" -> "height: 240px; overflow: auto; margin-top: 600px"
+            "x" -> "height: 100px; overflow-x: clip; overflow-y: visible"
+            _ -> nil
+          end
+        }
+      >
+        <div :for={{id, index} <- @editors} style="min-height: 60vh">
+          <.kotoba
+            field={@form["body_#{index}"]}
+            id={"editor_#{index}"}
+            label={"Block #{index}"}
+            collab={@collab[id]}
+            nodes={if(@nodes == index, do: ["/assets/nodes/tag.js"], else: [])}
+          />
+        </div>
       </div>
     </.form>
+    <button id="many-remove" phx-click="remove">Remove the last editor</button>
+    <button id="many-remove-first" phx-click="remove_first">Remove the first editor</button>
+    <button id="many-writable" phx-click="writable">Make the first editor writable</button>
+    <button id="many-add" phx-click="add">Add an editor</button>
+    <button id="many-insert" phx-click="insert" phx-value-editor={@nodes}>
+      Insert a tag in the editor with node modules
+    </button>
     <p :if={@saved} id="many-saved">{@saved}</p>
     """
   end
 
   def handle_event("kotoba:collab_token", %{"document_id" => id}, socket) do
-    if id in socket.assigns.ids do
-      {:reply, Kotoba.Collab.token(socket, id, user: socket.assigns.user), socket}
+    if id in socket.assigns.ids and not socket.assigns.deny do
+      {:reply,
+       Kotoba.Collab.token(socket, id, [user: socket.assigns.user] ++ socket.assigns.opts),
+       socket}
     else
       {:reply, %{}, socket}
     end
   end
 
+  defp bad_credentials(collab, nil, _prefix), do: collab
+
+  defp bad_credentials(collab, n, prefix) do
+    id = "#{prefix}-#{n}"
+
+    if Map.has_key?(collab, id),
+      do: Map.update!(collab, id, &Map.delete(&1, "token")),
+      else: collab
+  end
+
+  defp saved_texts(%{"text" => _}, editors),
+    do: Map.new(1..length(editors), &{"body_#{&1}", Kotoba.Content.from_markdown("Block #{&1}")})
+
+  defp saved_texts(_params, _editors), do: %{}
+
+  def handle_event("insert", %{"editor" => n}, socket),
+    do:
+      {:noreply,
+       Kotoba.Live.insert_node(socket, "editor_#{n}", %KotobaDev.Nodes.Tag{label: "tag"})}
+
+  def handle_event("add", _params, socket) do
+    n = socket.assigns.editors |> Enum.map(&elem(&1, 1)) |> Enum.max(fn -> 0 end) |> Kernel.+(1)
+    id = "#{socket.assigns.prefix}-#{n}"
+    token = Kotoba.Collab.token(socket, id, [user: socket.assigns.user] ++ socket.assigns.opts)
+    token = if socket.assigns.badcollab == "#{n}", do: Map.delete(token, "token"), else: token
+
+    {:noreply,
+     assign(socket,
+       ids: socket.assigns.ids ++ [id],
+       editors: socket.assigns.editors ++ [{id, n}],
+       collab: Map.put(socket.assigns.collab, id, token)
+     )}
+  end
+
+  def handle_event("writable", _params, socket),
+    do: {:noreply, Kotoba.Live.set_readonly(socket, "editor_1", false)}
+
+  def handle_event("remove_first", _params, socket),
+    do: {:noreply, assign(socket, editors: Enum.drop(socket.assigns.editors, 1))}
+
+  def handle_event("remove", _params, socket),
+    do: {:noreply, assign(socket, editors: Enum.drop(socket.assigns.editors, -1))}
+
   def handle_event("save", %{"kotoba_collab" => revisions}, socket) do
     texts =
       socket.assigns.editors
-      |> Enum.with_index(1)
       |> Enum.map(fn {id, index} ->
         with {:ok, json} <- Map.fetch(revisions, "editor_#{index}"),
              {:ok, revision} <- JSON.decode(json),
@@ -1080,6 +1180,44 @@ defmodule KotobaDev.ManyCollabLive do
       end)
 
     {:noreply, assign(socket, saved: Enum.join(texts, "|"))}
+  end
+end
+
+defmodule KotobaDev.NestedCollabLive do
+  @moduledoc false
+  # The many-editors page as a nested LiveView, under a page with a shared editor of its own:
+  # /collab/nested?document=ID&count=3&name=Ada (the many page's parameters).
+  use Phoenix.LiveView
+  import Kotoba.Components
+
+  def mount(params, _session, socket) do
+    prefix = Map.get(params, "document", "nested")
+    name = Map.get(params, "name", "Ada")
+    id = "#{prefix}-parent"
+    user = %{id: name, name: name}
+
+    {:ok,
+     assign(socket,
+       params: params,
+       document_id: id,
+       user: user,
+       collab: Kotoba.Collab.token(socket, id, user: user),
+       form: to_form(%{}, as: :parent)
+     )}
+  end
+
+  def render(assigns) do
+    ~H"""
+    <h1>Nested shared editors</h1>
+    <.kotoba field={@form[:body]} id="parent_editor" label="Parent" collab={@collab} />
+    {live_render(@socket, KotobaDev.ManyCollabLive, id: "nested", session: %{"params" => @params})}
+    """
+  end
+
+  def handle_event("kotoba:collab_token", %{"document_id" => id}, socket) do
+    if id == socket.assigns.document_id,
+      do: {:reply, Kotoba.Collab.token(socket, id, user: socket.assigns.user), socket},
+      else: {:reply, %{}, socket}
   end
 end
 
@@ -1104,6 +1242,7 @@ defmodule KotobaDev.Router do
     live("/extensions", KotobaDev.ExtensionsLive)
     live("/collab", KotobaDev.CollabLive)
     live("/collab/many", KotobaDev.ManyCollabLive)
+    live("/collab/nested", KotobaDev.NestedCollabLive)
   end
 end
 

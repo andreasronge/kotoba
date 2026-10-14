@@ -116,6 +116,7 @@ import { buildCommandBar, createToolbar, type Toolbar } from "./toolbar";
 import { SELECTION_MENU_COMMANDS, attachLinkCard, attachSelectionMenu, type Floating } from "./selection_menu";
 import { createUploads, type Uploads } from "./uploads";
 import { attachCollaboration, readCollabCredentials, type Collaboration, type CollabCredentials } from "./collaboration";
+import { joinForm, type FormMembership } from "./forms";
 
 /**
  * The part of a LiveView hook that Kotoba uses. LiveView calls the hook's
@@ -131,6 +132,7 @@ export interface LiveViewHook {
 
 interface KotobaHook extends LiveViewHook {
   kotoba?: Instance;
+  kotobaForm?: FormMembership;
 }
 
 export interface Config {
@@ -271,6 +273,7 @@ class Instance {
   private uploads: Uploads | null = null;
   private suggestions: Suggestions | null = null;
   private collaboration: Collaboration | null = null;
+  private readonly form: FormMembership;
   private appReadonly = false;
 
   private json = "";
@@ -282,10 +285,11 @@ class Instance {
   private change: boolean;
   private readonly ready: Promise<void>;
 
-  constructor(hook: KotobaHook) {
+  constructor(hook: KotobaHook, form: FormMembership) {
     this.hook = hook;
     this.el = hook.el;
     this.config = readConfig(hook.el);
+    this.form = form;
     this.appReadonly = this.config.readonly;
     this.readonlyAttribute = hook.el.dataset.readonly;
     this.change = this.config.change;
@@ -301,9 +305,13 @@ class Instance {
     // Server events are registered at once, so that none is lost while the
     // app node modules load; each one waits for the editor.
     this.on("set_content", (payload) => this.setContent(payload.doc));
-    this.on("insert_node", (payload) =>
-      this.insertNode(payload.node, typeof payload.ref === "string" ? payload.ref : undefined),
-    );
+    // A shared editor takes an insert once it holds the shared document: before its first
+    // join the insert would be replaced by the snapshot.
+    this.on("insert_node", (payload) => {
+      const insert = (): void => this.insertNode(payload.node, typeof payload.ref === "string" ? payload.ref : undefined);
+      if (this.collaboration) void this.collaboration.whenJoined().then(() => { if (!this.destroyed) insert(); }, () => {});
+      else insert();
+    });
     this.on("remove_marker", (payload) => {
       if (typeof payload.ref === "string") this.uploads?.remove(payload.ref);
     });
@@ -315,9 +323,14 @@ class Instance {
         this.prompts?.receive(payload.prompt, payload.items, payload.query, payload.error);
     });
 
-    this.ready = this.mount().catch((error: unknown) => {
+    // A shared editor is its form's member from its mount: started (with its client) or failed.
+    this.ready = this.mount().then(() => {
+      if (this.collaboration && !this.destroyed) this.form.started(this.collaboration);
+      else if (!this.destroyed && this.config.collab) this.form.failed();
+    }, (error: unknown) => {
       console.error("Kotoba: the editor could not mount", error);
       if (this.config.collab) { this.applyReadonly(true); this.announce("The shared editor could not connect."); }
+      this.form.failed();
     });
   }
 
@@ -549,13 +562,20 @@ class Instance {
     editor.setRootElement(editable);
     this.loaded = true;
     if (this.config.collab) {
+      // The saved text shows (read-only) until the first join replaces it with the shared
+      // document: an editor that joins on visibility may not join for a long time.
+      this.load(initial);
       this.collaboration = await attachCollaboration({
         editor, api: EXTENSION_API, element: this.el, surface, editable,
         credentials: this.config.collab, initialReadonly: this.config.readonly,
         readDocument: () => toEnvelope(editor.getEditorState()),
         announce: this.announce,
         setReadonly: (value) => this.applyReadonly(value || this.appReadonly),
-        refreshCredentials: () => new Promise((resolve, reject) => {
+        // The LiveView answers: after a disconnection it may connect again after the
+        // collaboration socket, so the request waits for it (up to 30 s) before its own 10 s.
+        refreshCredentials: () => this.whenConnected(30_000).then(() => new Promise((resolve, reject) => {
+          // Destroyed meanwhile: no request from a removed editor.
+          if (this.destroyed) { reject(new Error("Collaboration credentials could not be renewed")); return; }
           const timer = setTimeout(() => reject(new Error("Collaboration credentials could not be renewed")), 10_000);
           const reply = (payload: unknown): void => {
             clearTimeout(timer);
@@ -568,10 +588,23 @@ class Instance {
           const payload = { v: 1, id: this.id, document_id: this.config.collab!.document_id };
           if (target) this.hook.pushEventTo(target, "kotoba:collab_token", payload, reply);
           else this.hook.pushEvent("kotoba:collab_token", payload, reply);
-        }),
+        })),
       });
       if (this.destroyed) this.collaboration.dispose();
     } else this.load(initial);
+  }
+
+  // Resolves when the editor's LiveView is connected, or after `limit` milliseconds.
+  private whenConnected(limit: number): Promise<void> {
+    const started = Date.now();
+    return new Promise(resolve => {
+      const check = (): void => {
+        // The editor's own LiveView: a connected parent does not answer for a nested one.
+        if (this.destroyed || this.el.closest("[data-phx-session]")?.classList.contains("phx-connected") || Date.now() - started > limit) resolve();
+        else setTimeout(check, 100);
+      };
+      check();
+    });
   }
 
   // Reads a document into the editor (the first document, or one from
@@ -772,7 +805,9 @@ class Instance {
 
   destroy(): void {
     this.destroyed = true;
-    this.collaboration?.dispose();
+    this.form.removed();
+    // An editor removed while its collaboration starts disposes the client it has already.
+    (this.collaboration ?? (this.el as HTMLElement & { kotobaCollab?: Collaboration }).kotobaCollab)?.dispose();
     clearTimeout(this.timer);
     for (const ref of this.handlers) this.hook.removeHandleEvent(ref);
     this.prompts?.dispose();
@@ -818,9 +853,26 @@ function copyLabel(from: HTMLElement, to: HTMLElement): void {
 }
 
 /** The LiveView hook. */
+// An announcement in the editor's live region (none yet: logged).
+function announceIn(element: HTMLElement, message: string): void {
+  const live = element.querySelector(".kotoba-live");
+  if (!live) { console.error(`Kotoba: ${message}`); return; }
+  live.textContent = "";
+  window.setTimeout(() => { live.textContent = message; }, 50);
+}
+
 export const Kotoba = {
   mounted(this: KotobaHook): void {
-    this.kotoba = new Instance(this);
+    // A shared editor is a member of its form's submit from here, before the editor: one whose
+    // configuration cannot be read still counts (as failed), and its removal releases the form.
+    const form = this.el.dataset.collab ? joinForm(this.el, (message) => announceIn(this.el, message)) : { started() {}, failed() {}, removed() {} };
+    this.kotobaForm = form;
+    try { this.kotoba = new Instance(this, form); } catch (error) {
+      if (!this.el.dataset.collab) throw error;
+      // Logged, not thrown: a hook that throws stops the LiveView's join for the whole page.
+      console.error("Kotoba: the shared editor could not start", error);
+      form.failed();
+    }
   },
   updated(this: KotobaHook): void {
     this.kotoba?.syncAttributes();
@@ -828,5 +880,6 @@ export const Kotoba = {
   destroyed(this: KotobaHook): void {
     this.kotoba?.destroy();
     this.kotoba = undefined;
+    this.kotobaForm?.removed();
   },
 };

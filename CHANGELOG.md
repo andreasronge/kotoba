@@ -7,12 +7,44 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `Kotoba.Collab.token(..., join: :visible)`: a shared editor joins its
+  channel when it comes near the screen (within 200 px of the window and of
+  every scrolling or clipping box around it), is focused or has edits to
+  send, and leaves it after `park_after` milliseconds (30 000) off screen,
+  or in a hidden tab, with nothing to send or confirm. A page of many
+  shared editors keeps only the channels of those in use open.
+
+### Changed
+
+- The shared editors of a page share one Phoenix socket (each with its own
+  channel); a second editor of the same document gets a socket of its own.
+- Joins wait for the socket, and credentials older than four minutes are
+  renewed (one renewal at a time) before a join, a rejoin after a
+  disconnection, a channel retry and after a join refused as expired.
+  Channel errors and join timeouts retry through the same path with a
+  backoff (1 s, doubling to 30 s). A refused renewal freezes the draft.
+- A shared editor shows its field's saved text, read-only, until its first
+  join replaces it with the shared document (it showed nothing), and a
+  server `insert_node` waits for that join.
+
 ### Fixed
 
 - A colleague's edit in a shared editor no longer takes the focus and the
   caret from another editor of the page, so what the author types next is
   no longer lost: an editor without focus restores its selection in the
   model only.
+- A form with shared editors posted no accepted revision for an editor that
+  had not started or joined yet, or that changed after its flush. The
+  submit now waits for the form's editors to start and join, keeps them
+  and their toolbars read-only until every editor has a confirmed revision
+  (flushing again those that changed), refuses the form while one of its
+  shared editors could not start, and leaves out an editor removed
+  meanwhile.
+- Shared editor credentials that cannot be read no longer stop the
+  LiveView from joining: the error is logged and the editor's form refuses
+  to submit until it is removed.
 
 ## [0.2.1] - 2026-10-08
 

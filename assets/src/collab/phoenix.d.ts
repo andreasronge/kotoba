@@ -13,5 +13,9 @@ declare module "phoenix" {
     connect(): void;
     disconnect(): void;
     channel(topic: string, params: Record<string, unknown> | (() => Record<string, unknown>)): Channel;
+    onOpen(callback: () => void): string;
+    onClose(callback: () => void): string;
+    isConnected(): boolean;
+    off(refs: string[]): void;
   }
 }

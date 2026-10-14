@@ -152,6 +152,24 @@ socket = assign(socket, collab: collab)
 <.kotoba field={@form[:body]} id="body_editor" collab={@collab} />
 ```
 
+The shared editors of a page share one socket, each with its own channel.
+A page of many shared editors (a document of many text blocks) can join
+them lazily: with `join: :visible` an editor joins when it comes near the
+screen, is focused or has edits to send, and leaves after `park_after`
+milliseconds (30 000) off screen, or in a hidden tab, with nothing to
+send. A parked editor shows its last accepted text, takes edits (which
+rejoin it) and joins again on a form submit; restored unsent edits join it
+at once. Credentials older than four minutes are renewed through
+`kotoba:collab_token` before a join. "Near the screen" is within 200 px of
+the window and of every scrolling or clipping box around the editor. Until
+its first join, an editor shows its field's saved text, read-only, and a
+server `insert_node` waits for that join. A refused renewal freezes the
+draft (with its download), as a refused join does.
+
+```elixir
+Kotoba.Collab.token(socket, block.id, user: user, join: :visible)
+```
+
 Use `role: :read` for viewers. `readonly` also locks the UI, but authorization
 and the signed role enforce permissions. The browser renews credentials
 through the LiveView every three minutes and after an expired join. Handle
