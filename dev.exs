@@ -1016,6 +1016,73 @@ defmodule KotobaDev.CollabLive do
        Kotoba.Live.insert_node(socket, "shared_editor", %KotobaDev.Nodes.Tag{label: "shared"})}
 end
 
+defmodule KotobaDev.ManyCollabLive do
+  @moduledoc false
+  # Many shared editors on one page, as in a document of many text blocks:
+  # /collab/many?document=ID&count=20&name=Ada.
+  use Phoenix.LiveView
+  import Kotoba.Components
+
+  def mount(params, _session, socket) do
+    prefix = Map.get(params, "document", "many")
+    count = params |> Map.get("count", "20") |> String.to_integer() |> min(50)
+    name = Map.get(params, "name", "Ada")
+    user = %{id: name, name: name}
+    ids = Enum.map(1..count, &"#{prefix}-#{&1}")
+    # ?repeat=1: a last editor of the first editor's document.
+    editors = if params["repeat"], do: ids ++ [hd(ids)], else: ids
+
+    {:ok,
+     assign(socket,
+       ids: ids,
+       editors: editors,
+       user: user,
+       collab: Map.new(ids, &{&1, Kotoba.Collab.token(socket, &1, user: user)}),
+       form: to_form(%{}, as: :many),
+       saved: nil
+     )}
+  end
+
+  def render(assigns) do
+    ~H"""
+    <h1>Many shared editors</h1>
+    <.form for={@form} id="many-form" phx-submit="save">
+      <button type="submit" id="many-save">Publish accepted revisions</button>
+      <div :for={{id, index} <- Enum.with_index(@editors, 1)} style="min-height: 60vh">
+        <.kotoba field={@form["body_#{index}"]} id={"editor_#{index}"} label={"Block #{index}"} collab={@collab[id]} />
+      </div>
+    </.form>
+    <p :if={@saved} id="many-saved">{@saved}</p>
+    """
+  end
+
+  def handle_event("kotoba:collab_token", %{"document_id" => id}, socket) do
+    if id in socket.assigns.ids do
+      {:reply, Kotoba.Collab.token(socket, id, user: socket.assigns.user), socket}
+    else
+      {:reply, %{}, socket}
+    end
+  end
+
+  def handle_event("save", %{"kotoba_collab" => revisions}, socket) do
+    texts =
+      socket.assigns.editors
+      |> Enum.with_index(1)
+      |> Enum.map(fn {id, index} ->
+        with {:ok, json} <- Map.fetch(revisions, "editor_#{index}"),
+             {:ok, revision} <- JSON.decode(json),
+             {:ok, content} <-
+               Kotoba.Collab.content(KotobaDev.CollabSupervisor, id, revision) do
+          content.text
+        else
+          _ -> "?"
+        end
+      end)
+
+    {:noreply, assign(socket, saved: Enum.join(texts, "|"))}
+  end
+end
+
 defmodule KotobaDev.Router do
   use Phoenix.Router
 
@@ -1036,6 +1103,7 @@ defmodule KotobaDev.Router do
     live("/nodes", KotobaDev.NodesLive)
     live("/extensions", KotobaDev.ExtensionsLive)
     live("/collab", KotobaDev.CollabLive)
+    live("/collab/many", KotobaDev.ManyCollabLive)
   end
 end
 

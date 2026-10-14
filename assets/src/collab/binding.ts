@@ -278,6 +278,9 @@ export class Binding {
     const selection = preserveSelection ? this.selection() : null;
     const api = this.host.api.lexical;
     this.rendering = true;
+    // An editor without focus keeps its selection in the model only: setting the DOM
+    // selection would take the focus (and the caret) from another editor of the page.
+    const focused = this.host.editable.contains(document.activeElement);
     const nextRefs = new Map<string, NodeRef>();
     const nextKeys = new Map<string, string>();
     this.host.editor.update(() => {
@@ -329,7 +332,7 @@ export class Binding {
           api.$setSelection(range);
         }
       }
-    }, { tag: COLLAB_TAG, discrete: true });
+    }, { tag: focused ? COLLAB_TAG : [COLLAB_TAG, "skip-dom-selection"], discrete: true });
     this.rendering = false;
   }
 
