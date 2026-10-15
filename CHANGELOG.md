@@ -7,6 +7,13 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+
+- A colleague's edit in a shared editor no longer takes the focus and the
+  caret from another editor of the page, so what the author types next is
+  no longer lost: an editor without focus restores its selection in the
+  model only.
+
 ## [0.2.1] - 2026-10-08
 
 ### Fixed
