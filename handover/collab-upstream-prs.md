@@ -18,6 +18,14 @@ dev page or guide may name that application or depend on it. A PR may describe t
 | The downstream spike (private) | `~/projects/tyra/ska-collab`, branch `spike/kotoba-collab`, depends on this checkout by path (`{:kotoba, path: "../../kotoba"}`) |
 | Benchmark | `handover/journal_bench.exs` (`mix run handover/journal_bench.exs`) |
 
+**`integration/collab` (fork only)** is what the downstream app installs: this branch, plus the
+toolbar focus fix from #39's review (Undo/Redo from the toolbar return the focus to the editor),
+plus the six built bundles committed (`priv/static`, unignored there; a Git dependency needs
+them). The app pins it by commit (`7c6e1db`). When an upstream PR changes in review, bring the
+change there too: rebuild with `mix kotoba.build` in the same commit (a rebuild must leave
+`git status` clean), run `mix precommit` and the collaboration specs, push, then move the app's pin.
+Never base an upstream PR on it.
+
 Commands (this repo):
 
 - `mix precommit`: warnings as errors, format, `credo --strict`, tests (574 pass on the fork tip).
