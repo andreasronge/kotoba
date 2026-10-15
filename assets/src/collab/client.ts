@@ -335,6 +335,8 @@ class Client implements Collaboration {
     const target = isRedo ? this.undoStack : this.redoStack;
     const change = source.pop();
     if (!change) return true;
+    // An explicit history command returns focus from its toolbar before rendering.
+    this.host.editable.focus({ preventScroll: true });
     this.enqueue(isRedo ? redo(change) : change.inverse);
     target.push(change);
     this.lastEdit = 0;

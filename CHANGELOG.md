@@ -39,6 +39,9 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   caret from another editor of the page, so what the author types next is
   no longer lost: an editor without focus restores its selection in the
   model only.
+- Undo and Redo from a shared editor's toolbar return the focus to the
+  editor, so what the author types next goes into it (an editor without
+  focus no longer takes it when it renders).
 - A form with shared editors posted no accepted revision for an editor that
   had not started or joined yet, or that changed after its flush. The
   submit now waits for the form's editors to start and join, keeps them

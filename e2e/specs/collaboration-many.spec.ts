@@ -1,5 +1,5 @@
 import { expect, test, type Page, type WebSocketRoute } from "@playwright/test";
-import { focusEnd, openEditor } from "./support";
+import { documentEnd, focusEnd, openEditor, settle } from "./support";
 
 // A page of many shared editors, as a document of many text blocks.
 const editor = (page: Page, n: number) => page.locator(`#editor_${n} .kotoba-editable`);
@@ -114,6 +114,38 @@ test("a colleague's edit in another editor of the page leaves the caret where it
   await expect(editor(page, 1)).toHaveText("one more");
   await expect(editor(page, 2)).toHaveText("two!");
   await context.close();
+});
+
+test("keyboard undo and redo return focus to the collaborative editor", async ({ page }) => {
+  await open(page, `document=${crypto.randomUUID()}&count=1&name=Ada`);
+  const editable = editor(page, 1);
+  const toolbar = page.locator("#editor_1 [role=toolbar]");
+  await focusEnd(page, editable);
+  await page.keyboard.type("to undo");
+  await settle(page);
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("End");
+  await page.keyboard.press("ArrowLeft");
+
+  const undo = toolbar.getByRole("button", { name: "Undo", exact: true });
+  await expect(undo).toBeFocused();
+  await expect(undo).toHaveAttribute("aria-disabled", "false");
+  await page.keyboard.press("Enter");
+  await expect(editable).not.toHaveText("to undo");
+  await expect(editable).toBeFocused();
+
+  await settle(page);
+  await page.keyboard.press("Shift+Tab");
+  await expect(undo).toBeFocused();
+  await page.keyboard.press("ArrowRight");
+  await expect(toolbar.getByRole("button", { name: "Redo", exact: true })).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(editable).toHaveText("to undo");
+  await expect(editable).toBeFocused();
+  await documentEnd(page);
+  await settle(page);
+  await page.keyboard.type(" more");
+  await expect(editable).toHaveText("to undo more");
 });
 
 test("a second editor of the same document gets its own socket", async ({ page }) => {
