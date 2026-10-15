@@ -91,7 +91,7 @@ class Client implements Collaboration {
       demand: () => this.demand(),
       joined: payload => this.joined(payload as Join),
       lost: () => this.offline(),
-      changed: () => { if (!this.connection.joined) this.presence.offline(); this.updateStatus(); },
+      changed: () => { if (!this.connection.joined) this.presence.offline(); this.showStatus(); },
       transaction: payload => this.receive(payload as Transaction),
       presence: payload => this.presence.receive((payload as { people: Person[] }).people),
       refused: message => this.fail(message),
@@ -144,13 +144,13 @@ class Client implements Collaboration {
     this.cleanups.push(this.host.editor.registerCommand(api.UNDO_COMMAND, () => this.history(false), api.COMMAND_PRIORITY_CRITICAL));
     this.cleanups.push(this.host.editor.registerCommand(api.REDO_COMMAND, () => this.history(true), api.COMMAND_PRIORITY_CRITICAL));
     this.cleanups.push(this.host.editor.registerCommand(api.SELECTION_CHANGE_COMMAND, () => { this.awareness(); return false; }, api.COMMAND_PRIORITY_LOW));
-    const status = (): void => this.updateStatus();
+    const status = (): void => this.showStatus();
     window.addEventListener("offline", status);
     window.addEventListener("online", status);
     this.cleanups.push(() => { window.removeEventListener("offline", status); window.removeEventListener("online", status); });
     if (this.lazy) this.watchVisibility();
     this.running = true;
-    this.updateStatus();
+    this.showStatus();
     this.connection.update();
     const compositionEnd = (): void => { setTimeout(() => { if (!this.disposed && !this.failure) { this.render(); this.send(); this.awareness(); } }, 0); };
     this.host.editable.addEventListener("compositionend", compositionEnd);
@@ -230,7 +230,7 @@ class Client implements Collaboration {
       this.applyReadonly();
       this.persist();
       this.send();
-      this.updateStatus();
+      this.showStatus();
       this.awareness();
     } catch { this.fail("Your local edits need review. Your local draft is preserved."); return; }
     this.everJoined = true;
@@ -250,7 +250,7 @@ class Client implements Collaboration {
     if (this.inFlight === event.id) this.inFlight = null;
     try { this.render(); } catch { this.fail("A concurrent change needs review. Your local draft is preserved."); return; }
     this.persist();
-    this.updateStatus();
+    this.showStatus();
     this.presence.draw();
     this.send();
     if (this.pending.length === 0) this.settle(this.drained);
@@ -277,7 +277,7 @@ class Client implements Collaboration {
     this.revisionInput.value = "";
     this.persist();
     this.connection.update();
-    this.updateStatus();
+    this.showStatus();
     clearTimeout(this.sendTimer);
     this.sendTimer = setTimeout(() => this.send(), 80);
     this.awareness();
@@ -294,7 +294,7 @@ class Client implements Collaboration {
   private persist(): void {
     if (!this.accepted || !this.localBackup) return;
     const backup = clone({ state: this.accepted, pending: this.pending, sent: this.pending.filter(transaction => this.sent.has(transaction.id)).map(transaction => transaction.id) });
-    this.persistenceChain = this.persistenceChain.then(() => this.persistence.save(backup)).catch(() => { this.localBackup = false; this.updateStatus(); });
+    this.persistenceChain = this.persistenceChain.then(() => this.persistence.save(backup)).catch(() => { this.localBackup = false; this.showStatus(); });
   }
 
   private send(): void {
@@ -318,7 +318,7 @@ class Client implements Collaboration {
               this.flushing -= 1;
               const payload = value as Join;
               if (this.accepted && payload.state.revision >= this.accepted.revision) this.accepted = payload.state;
-              this.render(); this.persist(); this.updateStatus(); this.send();
+              this.render(); this.persist(); this.showStatus(); this.send();
               if (this.pending.length === 0) this.settle(this.drained);
               this.connection.update();
             }).receive("error", () => { this.flushing -= 1; this.fail("Access changed. Your local draft is preserved."); }).receive("timeout", () => { this.flushing -= 1; this.connection.update(); });
@@ -438,7 +438,7 @@ class Client implements Collaboration {
     this.inFlight = null;
     this.presence.offline();
     this.rejectAll(RECONNECT, false);
-    this.updateStatus();
+    this.showStatus();
   }
 
   private fail(message: string): void {
@@ -450,11 +450,11 @@ class Client implements Collaboration {
     this.recover.hidden = this.view === null;
     this.rejectAll(message, true);
     this.presence.offline();
-    this.updateStatus();
+    this.showStatus();
     this.host.announce(message);
   }
 
-  private updateStatus(): void {
+  showStatus(): void {
     const joined = this.connection.joined;
     // Parked: not wanted (idle), not waiting for a socket, a retry or a join. One that never
     // joined shows its field's saved text, so it is "Saved" too.

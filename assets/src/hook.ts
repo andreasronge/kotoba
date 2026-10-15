@@ -591,6 +591,8 @@ class Instance {
         })),
       });
       if (this.destroyed) this.collaboration.dispose();
+      // A patch while it started dropped the status it had put on the element.
+      else this.collaboration.showStatus();
     } else this.load(initial);
   }
 
@@ -692,9 +694,11 @@ class Instance {
   // LiveView patches the data attributes of a `phx-update="ignore"` element
   // and then calls `updated()`. A new `data-readonly` value sets the state; the
   // same value again does not undo a `set_readonly` push. `data-change` turns
-  // the `kotoba:change` pushes on or off.
+  // the `kotoba:change` pushes on or off. The patch removes `data-collab-state`,
+  // which the server does not render: the collaboration puts it back.
   syncAttributes(): void {
     if (this.editable !== null) syncAria(this.el, this.editable);
+    this.collaboration?.showStatus();
     this.setChange(this.el.dataset.change === "true");
     const value = this.el.dataset.readonly;
     if (value === this.readonlyAttribute) return;

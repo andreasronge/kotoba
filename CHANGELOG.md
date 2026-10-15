@@ -31,6 +31,10 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Fixed
 
+- A shared editor keeps its `data-collab-state` when its LiveView renders the
+  element again (a LiveView that crashed and joined again, or any patch of
+  the element's data attributes): LiveView removed it until the next status
+  change.
 - A colleague's edit in a shared editor no longer takes the focus and the
   caret from another editor of the page, so what the author types next is
   no longer lost: an editor without focus restores its selection in the

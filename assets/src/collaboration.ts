@@ -20,6 +20,8 @@ export interface Collaboration extends SubmitParticipant {
   /** Resolves after the first join (joining now if needed): the editor holds the shared document. */
   whenJoined(): Promise<void>;
   updateCredentials(credentials: CollabCredentials): void;
+  /** Puts its status on the editor again (a LiveView patch replaces the element's data attributes). */
+  showStatus(): void;
   dispose(): void;
 }
 

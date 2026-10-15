@@ -1062,7 +1062,9 @@ defmodule KotobaDev.ManyCollabLive do
          |> bad_credentials(params["badcollab"], prefix),
        # ?text=1: each field holds a saved text, as an app's stored content.
        form: to_form(saved_texts(params, editors), as: :many),
-       saved: nil
+       saved: nil,
+       # Changes with each mount (a crashed LiveView is mounted again).
+       mount: System.unique_integer([:positive])
      )}
   end
 
@@ -1105,10 +1107,12 @@ defmodule KotobaDev.ManyCollabLive do
     <button id="many-remove-first" phx-click="remove_first">Remove the first editor</button>
     <button id="many-writable" phx-click="writable">Make the first editor writable</button>
     <button id="many-add" phx-click="add">Add an editor</button>
+    <button id="many-crash" phx-click="crash">Crash this LiveView</button>
     <button id="many-insert" phx-click="insert" phx-value-editor={@nodes}>
       Insert a tag in the editor with node modules
     </button>
     <p :if={@saved} id="many-saved">{@saved}</p>
+    <p id="many-mount">{@mount}</p>
     """
   end
 
@@ -1158,6 +1162,10 @@ defmodule KotobaDev.ManyCollabLive do
 
   def handle_event("writable", _params, socket),
     do: {:noreply, Kotoba.Live.set_readonly(socket, "editor_1", false)}
+
+  # The LiveView process exits and the client joins it again: a full render patches the editors'
+  # elements, which keep their hooks and channels (nested, the parent's LiveView stays).
+  def handle_event("crash", _params, _socket), do: exit(:crash)
 
   def handle_event("remove_first", _params, socket),
     do: {:noreply, assign(socket, editors: Enum.drop(socket.assigns.editors, 1))}

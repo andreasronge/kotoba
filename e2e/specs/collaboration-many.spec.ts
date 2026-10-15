@@ -946,6 +946,32 @@ test("the editors of a nested LiveView share the page's socket, and their form s
   await expect(page.locator("#many-saved")).toHaveText("|two|");
 });
 
+test("a nested LiveView that crashes and joins again keeps its editors and their status; the parent's editor stays", async ({ page }) => {
+  const id = crypto.randomUUID();
+  const traffic = watch(page);
+  await openEditor(page, `/collab/nested?document=${id}&count=2&name=Ada`, "editor_1");
+  await expect(page.locator("#parent_editor")).toHaveAttribute("data-collab-state", "saved");
+  for (let n = 1; n <= 2; n++) await expect(page.locator(`#editor_${n}`)).toHaveAttribute("data-collab-state", "saved");
+  await focusEnd(page, editor(page, 2));
+  await page.keyboard.type("two");
+  await expect(page.locator("#editor_2")).toHaveAttribute("data-collab-state", "saved");
+  const mount = await page.locator("#many-mount").textContent();
+  await page.locator("#many-crash").click();
+  await expect(page.locator("#many-mount")).not.toHaveText(mount!, { timeout: 10_000 });
+  await expect(page.locator("#nested")).toHaveClass(/phx-connected/);
+  // The full render patches the editors' elements: their channels stay, and so does their state.
+  for (let n = 1; n <= 2; n++) await expect(page.locator(`#editor_${n}`)).toHaveAttribute("data-collab-state", "saved");
+  await expect(page.locator("#parent_editor")).toHaveAttribute("data-collab-state", "saved");
+  expect(traffic.leaves).toEqual([]);
+  expect(traffic.joins).toHaveLength(3);
+  expect(traffic.sockets).toHaveLength(1);
+  await focusEnd(page, editor(page, 2));
+  await page.keyboard.type(" more");
+  await expect(page.locator("#editor_2")).toHaveAttribute("data-collab-state", "saved");
+  await page.locator("#many-save").click();
+  await expect(page.locator("#many-saved")).toHaveText("|two more");
+});
+
 test("a nested editor renews old credentials through its own LiveView", async ({ page }) => {
   const id = crypto.randomUUID();
   const control = await route(page);
