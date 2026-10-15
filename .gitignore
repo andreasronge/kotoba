@@ -6,6 +6,14 @@
 assets/node_modules
 e2e/node_modules
 /priv/static/*
+# Fork only (integration/collab): the six bundle files are committed, so that an app can depend
+# on this branch through Git. Rebuild them (mix kotoba.build) in every commit that changes assets.
+!/priv/static/kotoba.esm.js
+!/priv/static/kotoba.cjs.js
+!/priv/static/kotoba-collab.esm.js
+!/priv/static/kotoba-collab.cjs.js
+!/priv/static/kotoba.css
+!/priv/static/kotoba-sumi.css
 /tmp
 e2e/test-results
 e2e/playwright-report

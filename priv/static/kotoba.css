@@ -1,0 +1,1099 @@
+/*
+ * Kotoba editor styles.
+ *
+ * Structural editor styles and a readable rendered-content baseline.
+ * Every colour, space, radius and font comes from a
+ * --kotoba-* custom property. Set them on .kotoba (or higher) to theme the
+ * editor, or load kotoba-sumi.css to map them to the Sumi tokens. The
+ * defaults below have no specificity, so a value set on :root, on an
+ * ancestor or on .kotoba itself wins.
+ */
+
+:where(:root) {
+  --kotoba-font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --kotoba-font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --kotoba-font-size: 1rem;
+  --kotoba-line-height: 1.6;
+  --kotoba-text: #1f1f23;
+  --kotoba-muted: #6b6b76;
+  --kotoba-background: #ffffff;
+  --kotoba-surface: #f6f6f7;
+  --kotoba-border: #d9d9de;
+  --kotoba-accent: #2f5bd3;
+  --kotoba-accent-text: #ffffff;
+  --kotoba-selection: rgba(47, 91, 211, 0.16);
+  --kotoba-highlight: rgba(255, 204, 0, 0.4);
+  /* The palette of text colors and highlights. A text color is mixed with
+     the text colour, so that it reads on a dark background too. */
+  --kotoba-color-red: color-mix(in oklab, #dc2626 80%, var(--kotoba-text));
+  --kotoba-color-orange: color-mix(in oklab, #d9480f 80%, var(--kotoba-text));
+  --kotoba-color-yellow: color-mix(in oklab, #b08800 80%, var(--kotoba-text));
+  --kotoba-color-green: color-mix(in oklab, #1a7f37 80%, var(--kotoba-text));
+  --kotoba-color-blue: color-mix(in oklab, #2f5bd3 80%, var(--kotoba-text));
+  --kotoba-color-purple: color-mix(in oklab, #8a2be2 80%, var(--kotoba-text));
+  --kotoba-color-gray: color-mix(in oklab, #6b6b76 80%, var(--kotoba-text));
+  --kotoba-highlight-red: rgba(239, 68, 68, 0.25);
+  --kotoba-highlight-orange: rgba(249, 115, 22, 0.28);
+  --kotoba-highlight-yellow: var(--kotoba-highlight);
+  --kotoba-highlight-green: rgba(34, 197, 94, 0.25);
+  --kotoba-highlight-blue: rgba(59, 130, 246, 0.22);
+  --kotoba-highlight-purple: rgba(168, 85, 247, 0.22);
+  --kotoba-highlight-gray: rgba(120, 120, 130, 0.22);
+  --kotoba-mention-text: var(--kotoba-accent);
+  --kotoba-mention-background: var(--kotoba-selection);
+  --kotoba-radius: 6px;
+  --kotoba-space: 0.5rem;
+  --kotoba-padding: 0.75rem 1rem;
+  --kotoba-min-height: 8rem;
+  --kotoba-token-comment: #6b6b76;
+  --kotoba-token-keyword: #8a2be2;
+  --kotoba-token-string: #1a7f37;
+  --kotoba-token-constant: #b35900;
+  --kotoba-token-function: #2f5bd3;
+  --kotoba-token-attr: #a3336b;
+  --kotoba-token-variable: #1f1f23;
+  --kotoba-token-operator: #57575f;
+  --kotoba-token-punctuation: #57575f;
+  --kotoba-token-inserted: #1a7f37;
+  --kotoba-token-deleted: #c62828;
+  --kotoba-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  --kotoba-small: 0.875em;
+  --kotoba-icon-size: 18px;
+  --kotoba-h1-size: 1.75em;
+  --kotoba-h2-size: 1.45em;
+  --kotoba-h3-size: 1.2em;
+  --kotoba-h4-size: 1.05em;
+  --kotoba-heading-line-height: 1.25;
+  /* The width of a PDF or a video, and the height of a PDF's viewer. */
+  --kotoba-media-width: 40rem;
+  --kotoba-pdf-height: 28rem;
+}
+
+.kotoba {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--kotoba-border);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-background);
+  color: var(--kotoba-text);
+  font-family: var(--kotoba-font);
+  font-size: var(--kotoba-font-size);
+  line-height: var(--kotoba-line-height);
+}
+
+.kotoba:focus-within {
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+/* Toolbar */
+
+.kotoba-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--kotoba-space);
+  padding: calc(var(--kotoba-space) / 2) var(--kotoba-space);
+  border-bottom: 1px solid var(--kotoba-border);
+  background: var(--kotoba-surface);
+  border-radius: var(--kotoba-radius) var(--kotoba-radius) 0 0;
+}
+
+.kotoba-toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+
+.kotoba-toolbar-group + .kotoba-toolbar-group {
+  padding-left: var(--kotoba-space);
+  border-left: 1px solid var(--kotoba-border);
+}
+
+.kotoba-toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2rem;
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid transparent;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: var(--kotoba-small);
+  line-height: 1;
+  cursor: pointer;
+}
+
+/* The code language picker: a select that looks like the buttons. */
+.kotoba-toolbar-select {
+  min-height: 2rem;
+  padding: 0 0.5rem;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+  color: inherit;
+  font: inherit;
+  font-size: var(--kotoba-small);
+  cursor: pointer;
+}
+
+.kotoba-toolbar-select:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+.kotoba-toolbar-select[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* The table, code and image controls are hidden outside a table, a code
+   block or a selected image. */
+.kotoba-toolbar-group[hidden],
+.kotoba-toolbar-button[hidden],
+.kotoba-toolbar-select[hidden] {
+  display: none;
+}
+
+.kotoba-toolbar-button:hover {
+  border-color: var(--kotoba-border);
+}
+
+.kotoba-toolbar-button:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+.kotoba-toolbar-button[aria-pressed="true"] {
+  background: var(--kotoba-accent);
+  color: var(--kotoba-accent-text);
+}
+
+.kotoba-toolbar-button[aria-disabled="true"] {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.kotoba-icon {
+  display: block;
+  width: var(--kotoba-icon-size);
+  height: var(--kotoba-icon-size);
+  flex: none;
+}
+
+/* Editable surface */
+
+.kotoba-surface {
+  position: relative;
+  flex: 1;
+}
+
+.kotoba-editable {
+  min-height: var(--kotoba-min-height);
+  padding: var(--kotoba-padding);
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+}
+
+.kotoba-editable ::selection {
+  background: var(--kotoba-selection);
+}
+
+.kotoba-editable[aria-readonly="true"] {
+  cursor: default;
+}
+
+.kotoba-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: var(--kotoba-padding);
+  color: var(--kotoba-muted);
+  pointer-events: none;
+  user-select: none;
+}
+
+.kotoba-placeholder[hidden] {
+  display: none;
+}
+
+/* Content */
+
+.kotoba-paragraph,
+.kotoba-quote,
+.kotoba-ul,
+.kotoba-ol,
+.kotoba-code {
+  margin: 0 0 var(--kotoba-space);
+}
+
+.kotoba-h1, .kotoba-h2, .kotoba-h3, .kotoba-h4, .kotoba-h5, .kotoba-h6 {
+  margin: calc(var(--kotoba-space) * 1.5) 0 var(--kotoba-space);
+  font-family: var(--kotoba-heading-font, var(--kotoba-font));
+  line-height: var(--kotoba-heading-line-height);
+}
+
+.kotoba-h1 { font-size: var(--kotoba-h1-size); }
+.kotoba-h2 { font-size: var(--kotoba-h2-size); }
+.kotoba-h3 { font-size: var(--kotoba-h3-size); }
+.kotoba-h4 { font-size: var(--kotoba-h4-size); }
+
+.kotoba-quote {
+  padding-left: var(--kotoba-space);
+  border-left: 3px solid var(--kotoba-border);
+  color: var(--kotoba-muted);
+}
+
+.kotoba-ul, .kotoba-ol {
+  padding-left: 1.5em;
+}
+
+.kotoba-ul:not(.kotoba-check) { list-style: disc; }
+.kotoba-ol { list-style: decimal; }
+
+.kotoba-li-nested {
+  list-style-type: none;
+}
+
+.kotoba-check {
+  padding-left: 0;
+  list-style: none;
+}
+
+/* The editor's check list items, and the rendered ones
+   (`li.kotoba-checked`, `li.kotoba-unchecked` in `ul.kotoba-check`). */
+.kotoba-li-checked,
+.kotoba-li-unchecked,
+.kotoba-check > .kotoba-checked,
+.kotoba-check > .kotoba-unchecked {
+  position: relative;
+  padding-left: 1.6em;
+  list-style: none;
+  outline: none;
+}
+
+.kotoba-li-checked::before,
+.kotoba-li-unchecked::before,
+.kotoba-check > .kotoba-checked::before,
+.kotoba-check > .kotoba-unchecked::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.3em;
+  width: 1em;
+  height: 1em;
+  border: 1px solid var(--kotoba-muted);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+/* A rendered box is not a control. */
+.kotoba-check > .kotoba-checked::before,
+.kotoba-check > .kotoba-unchecked::before {
+  cursor: default;
+}
+
+.kotoba-li-checked::before,
+.kotoba-check > .kotoba-checked::before {
+  border-color: var(--kotoba-accent);
+  background: var(--kotoba-accent);
+}
+
+.kotoba-li-checked::after,
+.kotoba-check > .kotoba-checked::after {
+  content: "";
+  position: absolute;
+  left: 0.35em;
+  top: 0.4em;
+  width: 0.3em;
+  height: 0.55em;
+  border: solid var(--kotoba-accent-text);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.kotoba-li-checked,
+.kotoba-check > .kotoba-checked {
+  color: var(--kotoba-muted);
+  text-decoration: line-through;
+}
+
+.kotoba-li-checked:focus-visible::before,
+.kotoba-li-unchecked:focus-visible::before {
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+.kotoba-link {
+  color: var(--kotoba-accent);
+  text-decoration: underline;
+}
+
+.kotoba-bold { font-weight: 700; }
+.kotoba-italic { font-style: italic; }
+.kotoba-strike { text-decoration: line-through; }
+.kotoba-underline { text-decoration: underline; }
+.kotoba-underline.kotoba-strike { text-decoration: underline line-through; }
+.kotoba-highlight { background: var(--kotoba-highlight); color: inherit; }
+/* A highlight in a color of the palette: the editor puts the color on the
+   mark, in its style. */
+mark[style*="--kotoba-highlight-"] > .kotoba-highlight { background: transparent; }
+
+/* The case formats of rendered content (`Kotoba.Nodes.Text`). */
+.kotoba-lowercase { text-transform: lowercase; }
+.kotoba-uppercase { text-transform: uppercase; }
+.kotoba-capitalize { text-transform: capitalize; }
+
+/* The colors of rendered content (`Kotoba.Nodes.Text`). */
+.kotoba-color-red { color: var(--kotoba-color-red); }
+.kotoba-color-orange { color: var(--kotoba-color-orange); }
+.kotoba-color-yellow { color: var(--kotoba-color-yellow); }
+.kotoba-color-green { color: var(--kotoba-color-green); }
+.kotoba-color-blue { color: var(--kotoba-color-blue); }
+.kotoba-color-purple { color: var(--kotoba-color-purple); }
+.kotoba-color-gray { color: var(--kotoba-color-gray); }
+mark.kotoba-highlight-red { background: var(--kotoba-highlight-red); color: inherit; }
+mark.kotoba-highlight-orange { background: var(--kotoba-highlight-orange); color: inherit; }
+mark.kotoba-highlight-yellow { background: var(--kotoba-highlight-yellow); color: inherit; }
+mark.kotoba-highlight-green { background: var(--kotoba-highlight-green); color: inherit; }
+mark.kotoba-highlight-blue { background: var(--kotoba-highlight-blue); color: inherit; }
+mark.kotoba-highlight-purple { background: var(--kotoba-highlight-purple); color: inherit; }
+mark.kotoba-highlight-gray { background: var(--kotoba-highlight-gray); color: inherit; }
+
+.kotoba-inline-code,
+.kotoba-code {
+  font-family: var(--kotoba-font-mono);
+  font-size: 0.9em;
+  background: var(--kotoba-surface);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+}
+
+.kotoba-inline-code {
+  padding: 0.1em 0.3em;
+}
+
+.kotoba-code {
+  display: block;
+  padding: var(--kotoba-padding);
+  overflow-x: auto;
+  white-space: pre;
+  tab-size: 2;
+}
+
+.kotoba-token-comment { color: var(--kotoba-token-comment); font-style: italic; }
+.kotoba-token-keyword { color: var(--kotoba-token-keyword); }
+.kotoba-token-string { color: var(--kotoba-token-string); }
+.kotoba-token-constant { color: var(--kotoba-token-constant); }
+.kotoba-token-function { color: var(--kotoba-token-function); }
+.kotoba-token-attr { color: var(--kotoba-token-attr); }
+.kotoba-token-variable { color: var(--kotoba-token-variable); }
+.kotoba-token-operator { color: var(--kotoba-token-operator); }
+.kotoba-token-punctuation { color: var(--kotoba-token-punctuation); }
+.kotoba-token-inserted { color: var(--kotoba-token-inserted); }
+.kotoba-token-deleted { color: var(--kotoba-token-deleted); }
+
+.kotoba-hr {
+  margin: calc(var(--kotoba-space) * 2) 0;
+  border: none;
+  border-top: 1px solid var(--kotoba-border);
+  cursor: pointer;
+}
+
+/* Tables: the editor's and the rendered HTML's (both have these classes) */
+
+.kotoba-table-scroll {
+  max-width: 100%;
+  margin: 0 0 var(--kotoba-space);
+  overflow-x: auto;
+}
+
+.kotoba-table {
+  border-collapse: collapse;
+  margin: 0;
+  width: 100%;
+}
+
+.kotoba-table th,
+.kotoba-table td {
+  min-width: 4em;
+  /* A height is a minimum for a table cell: an empty cell keeps a line. */
+  height: calc(var(--kotoba-line-height) * 1em + var(--kotoba-space) * 1.5);
+  padding: calc(var(--kotoba-space) * 0.75) var(--kotoba-space);
+  border: 1px solid var(--kotoba-border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.kotoba-table th {
+  background: var(--kotoba-surface);
+  font-weight: 600;
+}
+
+.kotoba-table :is(th, td) > :last-child {
+  margin-bottom: 0;
+}
+
+/* Cells selected together: the cells show the selection, not the text. */
+.kotoba-table .kotoba-table-cell-selected {
+  background: var(--kotoba-selection);
+}
+
+.kotoba-table-selection ::selection {
+  background: transparent;
+}
+
+/* Decorator nodes */
+
+.kotoba-selected {
+  outline: 2px solid var(--kotoba-accent);
+  outline-offset: 2px;
+}
+
+.kotoba-mention {
+  display: inline-block;
+  padding: 0 0.35em;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-mention-background);
+  color: var(--kotoba-mention-text);
+  font-weight: 500;
+  cursor: default;
+}
+
+.kotoba-attachment {
+  margin: 0 0 var(--kotoba-space);
+  cursor: default;
+}
+
+.kotoba-attachment-figure {
+  display: inline-flex;
+  flex-direction: column;
+  gap: calc(var(--kotoba-space) / 2);
+  max-width: 100%;
+  margin: 0;
+  padding: calc(var(--kotoba-space) / 2);
+  border: 1px solid var(--kotoba-border);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-surface);
+}
+
+.kotoba-attachment-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+}
+
+.kotoba-attachment-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3rem;
+  height: 3rem;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+  color: var(--kotoba-muted);
+  font-family: var(--kotoba-font-mono);
+  font-size: 0.75em;
+}
+
+.kotoba-attachment-caption {
+  display: flex;
+  gap: var(--kotoba-space);
+  font-size: var(--kotoba-small);
+}
+
+.kotoba-attachment-size {
+  color: var(--kotoba-muted);
+}
+
+/* PDF and video attachments: the editor's (a viewer, a player) and the
+   rendered HTML's (an object, a video). */
+.kotoba-attachment-pdf .kotoba-attachment-figure,
+.kotoba-attachment-video .kotoba-attachment-figure,
+figure.kotoba-attachment-pdf,
+figure.kotoba-attachment-video {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--kotoba-space) / 2);
+  max-width: var(--kotoba-media-width, 40rem);
+}
+
+.kotoba-attachment-viewer,
+figure.kotoba-attachment-pdf > object {
+  display: block;
+  width: 100%;
+  height: var(--kotoba-pdf-height, 28rem);
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+}
+
+.kotoba-attachment-player,
+figure.kotoba-attachment-video > video {
+  display: block;
+  width: 100%;
+  max-height: 28rem;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: #000;
+}
+
+.kotoba-attachment-preview,
+figure.kotoba-attachment-pdf > a > img {
+  display: block;
+  max-width: 100%;
+  max-height: 28rem;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+}
+
+/* A video that did not load shows as a file. */
+.kotoba-attachment-failed {
+  display: inline-flex;
+}
+
+/* Galleries: the editor's (a div of attachment nodes) and the rendered
+   HTML's (a div of figures). */
+.kotoba-gallery {
+  display: grid;
+  /* auto-fit: two or three images share the row, with no empty tracks. */
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: calc(var(--kotoba-space) / 2);
+  margin: 0 0 var(--kotoba-space);
+}
+
+.kotoba-gallery > .kotoba-attachment {
+  min-width: 0;
+  margin: 0;
+}
+
+.kotoba-gallery .kotoba-attachment-figure,
+.kotoba-gallery > figure.kotoba-attachment {
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--kotoba-space) / 2);
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+.kotoba-gallery img {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+}
+
+.kotoba-gallery figcaption {
+  overflow: hidden;
+  font-size: var(--kotoba-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.kotoba-gallery .kotoba-attachment-caption > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kotoba-gallery > .kotoba-upload-marker {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 6rem;
+  text-align: center;
+}
+
+.kotoba-upload-marker,
+.kotoba-unknown {
+  display: inline-block;
+  padding: 0 0.35em;
+  border: 1px dashed var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  color: var(--kotoba-muted);
+  font-size: var(--kotoba-small);
+}
+
+div.kotoba-unknown {
+  display: block;
+  margin: 0 0 var(--kotoba-space);
+  padding: var(--kotoba-space);
+}
+
+/* Prompt menu and link form */
+
+.kotoba-menu,
+.kotoba-link-form {
+  position: absolute;
+  z-index: 10;
+  min-width: 14rem;
+  max-width: min(24rem, 100%);
+  border: 1px solid var(--kotoba-border);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-background);
+  box-shadow: var(--kotoba-shadow);
+}
+
+.kotoba-menu[hidden],
+.kotoba-link-form[hidden],
+.kotoba-color-menu[hidden],
+.kotoba-menu-list[hidden],
+.kotoba-menu-status[hidden] {
+  display: none;
+}
+
+.kotoba-menu-list {
+  max-height: 16rem;
+  margin: 0;
+  padding: calc(var(--kotoba-space) / 2);
+  overflow-y: auto;
+  list-style: none;
+}
+
+.kotoba-menu-option {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kotoba-space);
+  padding: calc(var(--kotoba-space) / 2) var(--kotoba-space);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  cursor: pointer;
+}
+
+.kotoba-menu-option[aria-selected="true"] {
+  background: var(--kotoba-accent);
+  color: var(--kotoba-accent-text);
+}
+
+.kotoba-menu-hint {
+  opacity: 0.75;
+  font-size: var(--kotoba-small);
+}
+
+.kotoba-menu-status {
+  padding: var(--kotoba-space);
+  color: var(--kotoba-muted);
+  font-size: var(--kotoba-small);
+}
+
+/* A suggestion from the server, under the editable area. */
+.kotoba-suggestion {
+  margin: var(--kotoba-space);
+  border: 1px solid var(--kotoba-accent);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-background);
+}
+
+.kotoba-suggestion-header {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--kotoba-space);
+  padding: calc(var(--kotoba-space) / 2) var(--kotoba-space);
+  border-bottom: 1px solid var(--kotoba-border);
+  background: var(--kotoba-selection);
+  font-size: var(--kotoba-small);
+}
+
+.kotoba-suggestion-title {
+  font-weight: 600;
+}
+
+.kotoba-suggestion-status {
+  color: var(--kotoba-muted);
+}
+
+.kotoba-suggestion-content {
+  max-height: 20rem;
+  overflow-y: auto;
+  padding: var(--kotoba-padding);
+  outline: none;
+}
+
+.kotoba-suggestion-content[aria-busy="true"] > :last-child::after {
+  content: "▍";
+  color: var(--kotoba-accent);
+}
+
+.kotoba-suggestion-actions {
+  display: flex;
+  gap: calc(var(--kotoba-space) / 2);
+  justify-content: flex-end;
+  padding: calc(var(--kotoba-space) / 2) var(--kotoba-space);
+  border-top: 1px solid var(--kotoba-border);
+}
+
+.kotoba-suggestion-button {
+  padding: 0.25rem 0.75rem;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+  color: var(--kotoba-text);
+  font: inherit;
+  font-size: var(--kotoba-small);
+  cursor: pointer;
+}
+
+.kotoba-suggestion-accept {
+  border-color: var(--kotoba-accent);
+  background: var(--kotoba-accent);
+  color: var(--kotoba-accent-text);
+}
+
+.kotoba-suggestion-button:focus-visible,
+.kotoba-assist-item:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+/* The Assist menu, under the toolbar. */
+.kotoba-assist-menu {
+  position: absolute;
+  z-index: 10;
+  top: 0;
+  right: var(--kotoba-space);
+  display: flex;
+  flex-direction: column;
+  min-width: 10rem;
+  padding: calc(var(--kotoba-space) / 2);
+  border: 1px solid var(--kotoba-border);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-background);
+  box-shadow: var(--kotoba-shadow);
+}
+
+.kotoba-assist-item {
+  padding: calc(var(--kotoba-space) / 2) var(--kotoba-space);
+  border: 0;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: transparent;
+  color: var(--kotoba-text);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.kotoba-assist-item:hover,
+.kotoba-assist-item:focus-visible {
+  background: var(--kotoba-surface);
+}
+
+.kotoba-suggestion[hidden],
+.kotoba-suggestion-button[hidden],
+.kotoba-assist-menu[hidden] {
+  display: none;
+}
+
+.kotoba-color-menu {
+  position: absolute;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  gap: calc(var(--kotoba-space) / 2);
+  padding: calc(var(--kotoba-space) / 2);
+  border: 1px solid var(--kotoba-border);
+  border-radius: var(--kotoba-radius);
+  background: var(--kotoba-background);
+  box-shadow: var(--kotoba-shadow);
+}
+
+.kotoba-color-group {
+  display: flex;
+  gap: 2px;
+}
+
+.kotoba-color-swatch {
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+  font: inherit;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.kotoba-color-swatch[aria-pressed="true"] {
+  border-color: var(--kotoba-text);
+  box-shadow: inset 0 0 0 1px var(--kotoba-text);
+}
+
+.kotoba-color-swatch:focus-visible,
+.kotoba-color-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+.kotoba-color-remove {
+  padding: 0.25rem 0.5rem;
+  border: 0;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: transparent;
+  color: var(--kotoba-text);
+  font: inherit;
+  font-size: var(--kotoba-small);
+  text-align: start;
+  cursor: pointer;
+}
+
+.kotoba-color-remove:hover {
+  background: var(--kotoba-surface);
+}
+
+.kotoba-link-form {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--kotoba-space) / 2);
+  padding: calc(var(--kotoba-space) / 2);
+}
+
+.kotoba-link-label {
+  font-size: var(--kotoba-small);
+  color: var(--kotoba-muted);
+}
+
+.kotoba-link-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.25rem 0.5rem;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-background);
+  color: var(--kotoba-text);
+  font: inherit;
+}
+
+.kotoba-link-apply,
+.kotoba-link-remove {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--kotoba-border);
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: var(--kotoba-surface);
+  color: inherit;
+  font: inherit;
+  font-size: var(--kotoba-small);
+  cursor: pointer;
+}
+
+.kotoba-link-apply {
+  border-color: var(--kotoba-accent);
+  background: var(--kotoba-accent);
+  color: var(--kotoba-accent-text);
+}
+
+.kotoba-link-remove[hidden] {
+  display: none;
+}
+
+.kotoba-link-input:focus-visible,
+.kotoba-link-apply:focus-visible,
+.kotoba-link-remove:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+/* Selection menu and link card: panels that float over the text. Theme
+   them with the floating properties (--kotoba-floating-background, -text,
+   -border, -hover, -shadow and -radius), or with the classes. Each one
+   falls back to the editor's own property. */
+
+.kotoba-selection-menu,
+.kotoba-link-card {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--kotoba-floating-border, var(--kotoba-border));
+  border-radius: var(--kotoba-floating-radius, var(--kotoba-radius));
+  background: var(--kotoba-floating-background, var(--kotoba-background));
+  color: var(--kotoba-floating-text, var(--kotoba-text));
+  box-shadow: var(--kotoba-floating-shadow, var(--kotoba-shadow));
+  font-family: var(--kotoba-font);
+  line-height: 1;
+  white-space: nowrap;
+  animation: kotoba-float-in 120ms ease-out;
+}
+
+.kotoba-selection-menu[hidden],
+.kotoba-link-card[hidden],
+.kotoba-link-card [hidden] {
+  display: none;
+}
+
+.kotoba-selection-menu[data-placement="bottom"],
+.kotoba-link-card[data-placement="bottom"] {
+  animation-name: kotoba-float-in-below;
+}
+
+@keyframes kotoba-float-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.98); }
+}
+
+@keyframes kotoba-float-in-below {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kotoba-selection-menu,
+  .kotoba-link-card {
+    animation: none;
+  }
+}
+
+.kotoba-selection-menu .kotoba-toolbar-group {
+  display: flex;
+  gap: 2px;
+}
+
+.kotoba-selection-menu .kotoba-toolbar-group + .kotoba-toolbar-group {
+  margin-left: 2px;
+  padding-left: 4px;
+  border-left: 1px solid var(--kotoba-floating-border, var(--kotoba-border));
+}
+
+.kotoba-selection-menu .kotoba-toolbar-button {
+  min-width: 1.875rem;
+  min-height: 1.875rem;
+  padding: 0 0.375rem;
+}
+
+.kotoba-selection-menu .kotoba-toolbar-button:hover,
+.kotoba-link-card-button:hover,
+.kotoba-link-card-url:hover {
+  border-color: transparent;
+  background: var(--kotoba-floating-hover, var(--kotoba-surface));
+}
+
+.kotoba-link-card {
+  max-width: min(26rem, 100%);
+}
+
+.kotoba-link-card-url {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  color: var(--kotoba-accent);
+  font-size: var(--kotoba-small);
+  text-decoration: none;
+}
+
+.kotoba-link-card-url .kotoba-icon {
+  width: 14px;
+  height: 14px;
+}
+
+.kotoba-link-card-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 18rem;
+}
+
+.kotoba-link-card-url:not([href]) {
+  color: var(--kotoba-muted);
+}
+
+.kotoba-link-card-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.875rem;
+  min-height: 1.875rem;
+  padding: 0;
+  border: 0;
+  border-radius: calc(var(--kotoba-radius) - 2px);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.kotoba-link-card-edit {
+  margin-left: 2px;
+  box-shadow: -3px 0 0 -2px var(--kotoba-floating-border, var(--kotoba-border));
+}
+
+.kotoba-link-card-button .kotoba-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.kotoba-link-card-url:focus-visible,
+.kotoba-link-card-button:focus-visible {
+  outline: none;
+  box-shadow: var(--kotoba-focus-ring, 0 0 0 2px var(--kotoba-accent));
+}
+
+/* Visually hidden: the live region and the LiveView file input */
+
+.kotoba-live,
+.kotoba-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .kotoba,
+  .kotoba * {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+/* Collaboration is optional; these selectors only apply to shared editors. */
+.kotoba-collab-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .75rem; padding: .5rem .75rem; font-size: .8125rem; border-bottom: 1px solid var(--kotoba-border, #d1d5db); }
+.kotoba-collab-people { display: flex; flex-wrap: wrap; gap: .75rem; list-style: none; margin: 0; padding: 0; }
+.kotoba-collab-people li { border-inline-start: 3px solid var(--collab-color); padding-inline-start: .4rem; }
+.kotoba-collab-cursors { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.kotoba-collab-caret { position: absolute; border-inline-start: 2px solid var(--collab-color); }
+.kotoba-collab-caret span { position: absolute; left: -2px; bottom: 100%; background: var(--collab-color); color: #fff; font: 11px/1.4 system-ui; white-space: nowrap; padding: 1px 4px; border-radius: 3px; }
+.kotoba-collab-selection { position: absolute; background: var(--collab-color); opacity: .15; }
+
+/* A readable baseline for <.kotoba_content>. Each rule has the specificity
+   of one class (.kotoba-content :where(a)), so it wins over an element reset
+   such as `a { color: inherit }` and Tailwind's preflight, and a rule of the
+   app with a class (`.article a`) or a later rule of the same weight
+   (`.prose` imported after this file) wins over it. */
+.kotoba-content { line-height: 1.65; overflow-wrap: anywhere; }
+.kotoba-content > :where(:first-child) { margin-top: 0; }
+.kotoba-content :where(p) { margin: 0 0 1em; }
+.kotoba-content :where(:is(h1, h2, h3, h4)) { line-height: 1.25; font-weight: 650; margin: 1.5em 0 .55em; }
+.kotoba-content :where(h1) { font-size: 2em; }
+.kotoba-content :where(h2) { font-size: 1.6em; }
+.kotoba-content :where(h3) { font-size: 1.3em; }
+.kotoba-content :where(h4) { font-size: 1.1em; }
+.kotoba-content :where(ul:not(.kotoba-check), ol) { padding-inline-start: 1.7em; margin: .5em 0 1.25em; }
+.kotoba-content :where(ul:not(.kotoba-check)) { list-style: disc; }
+.kotoba-content :where(ul.kotoba-check) { margin: .5em 0 1.25em; }
+.kotoba-content :where(ol) { list-style: decimal; }
+.kotoba-content :where(li) { margin: .25em 0; }
+.kotoba-content :where(blockquote) { border-inline-start: 3px solid var(--kotoba-border); padding-inline-start: 1em; margin: 1.5em 0; color: var(--kotoba-muted); }
+.kotoba-content :where(blockquote p:last-child) { margin-bottom: 0; }
+.kotoba-content :where(a) { color: var(--kotoba-accent); text-decoration: underline; text-underline-offset: .16em; }
+.kotoba-content :where(a:hover) { text-decoration-thickness: 2px; }
+.kotoba-content :where(:not(pre) > code) { font-family: var(--kotoba-font-mono); font-size: .9em; padding: .1em .3em; border-radius: 2px; background: var(--kotoba-surface); }
+.kotoba-content :where(pre) { display: block; max-width: 100%; overflow-x: auto; margin: 1.5em 0; padding: 1em 1.2em; border-radius: var(--kotoba-radius); background: var(--kotoba-surface); font: .9em/1.55 var(--kotoba-font-mono); white-space: pre; }
+.kotoba-content :where(pre code) { font: inherit; }
+.kotoba-content :where(hr) { border: 0; border-top: 1px solid var(--kotoba-border); margin: 2em 0; }
+.kotoba-content :where(pre .token.comment) { color: var(--kotoba-token-comment); font-style: italic; }
+.kotoba-content :where(pre .token.keyword) { color: var(--kotoba-token-keyword); }
+.kotoba-content :where(pre .token.string) { color: var(--kotoba-token-string); }
+.kotoba-content :where(pre .token:is(.number, .boolean, .constant)) { color: var(--kotoba-token-constant); }
+.kotoba-content :where(pre .token:is(.function, .class-name)) { color: var(--kotoba-token-function); }
+.kotoba-content :where(pre .token:is(.attr-name, .property)) { color: var(--kotoba-token-attr); }
+.kotoba-content :where(pre .token.operator) { color: var(--kotoba-token-operator); }
+.kotoba-content :where(pre .token.punctuation) { color: var(--kotoba-token-punctuation); }
