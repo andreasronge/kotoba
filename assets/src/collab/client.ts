@@ -1,9 +1,10 @@
-import { Socket, type Channel } from "phoenix";
+import type { Channel } from "phoenix";
 import type { Collaboration, CollaborationHost, CollabCredentials } from "../collaboration";
 import { Binding, COLLAB_TAG, redo, type Change } from "./binding";
 import { apply, clone, equal, envelope, uuid, type Operation, type State, type Transaction } from "./model";
 import { Persistence } from "./persistence";
 import { Presence, type Person } from "./presence";
+import { lease, type Lease } from "./sockets";
 
 interface FormBarrier { clients: Set<Client>; resubmit: boolean; busy: boolean; handler: (event: SubmitEvent) => void }
 const forms = new WeakMap<HTMLFormElement, FormBarrier>();
@@ -16,8 +17,8 @@ class Client implements Collaboration {
   private credentials: CollabCredentials;
   private readonly persistence: Persistence;
   private readonly binding: Binding;
-  private readonly socket: Socket;
-  private readonly channel: Channel;
+  private lease: Lease | null = null;
+  private channel!: Channel;
   private readonly presence: Presence;
   private readonly bar: HTMLDivElement;
   private readonly status: HTMLOutputElement;
@@ -67,8 +68,6 @@ class Client implements Collaboration {
     this.revisionInput.type = "hidden";
     this.revisionInput.name = `kotoba_collab[${host.element.id}]`;
     host.element.append(this.revisionInput);
-    this.socket = new Socket(this.credentials.socket);
-    this.channel = this.socket.channel(`kotoba:${this.credentials.document_id}`, () => ({ token: this.credentials.token, session: this.persistence.session, pending: this.pending.map(transaction => transaction.id) }));
   }
 
   async start(): Promise<void> {
@@ -83,6 +82,7 @@ class Client implements Collaboration {
         this.host.setReadonly(this.readonly || this.host.initialReadonly);
       }
     } catch { this.localBackup = false; }
+    if (this.disposed) return;
     const api = this.host.api.lexical;
     this.cleanups.push(this.host.editor.registerUpdateListener(({ tags, dirtyElements, dirtyLeaves }) => {
       if (tags.has(COLLAB_TAG) || !this.view || this.readonly || this.failure || (dirtyElements.size === 0 && dirtyLeaves.size === 0)) return;
@@ -103,17 +103,13 @@ class Client implements Collaboration {
     this.cleanups.push(this.host.editor.registerCommand(api.UNDO_COMMAND, () => this.history(false), api.COMMAND_PRIORITY_CRITICAL));
     this.cleanups.push(this.host.editor.registerCommand(api.REDO_COMMAND, () => this.history(true), api.COMMAND_PRIORITY_CRITICAL));
     this.cleanups.push(this.host.editor.registerCommand(api.SELECTION_CHANGE_COMMAND, () => { this.awareness(); return false; }, api.COMMAND_PRIORITY_LOW));
-    this.channel.on("transaction", payload => this.receive(payload as Transaction));
-    this.channel.on("presence", payload => this.presence.receive((payload as { people: Person[] }).people));
-    this.channel.onError(() => this.offline());
-    this.channel.onClose(() => this.offline());
-    this.channel.join().receive("ok", payload => this.joined(payload as Join)).receive("error", payload => { if ((payload as { reason?: string }).reason === "expired") void this.refreshCredentials(); else this.fail("Access to this shared document is unavailable. Your local draft is preserved."); }).receive("timeout", () => this.offline());
-    const disconnect = (): void => { this.offline(); this.socket.disconnect(); };
-    const reconnect = (): void => { if (!this.disposed && !this.failure) this.socket.connect(); };
-    window.addEventListener("offline", disconnect);
-    window.addEventListener("online", reconnect);
-    this.cleanups.push(() => { window.removeEventListener("offline", disconnect); window.removeEventListener("online", reconnect); });
-    if (navigator.onLine) this.socket.connect(); else this.offline();
+    // The lease's socket goes down and up with the browser; the channel joins again by itself.
+    const offline = (): void => this.offline();
+    window.addEventListener("offline", offline);
+    this.cleanups.push(() => window.removeEventListener("offline", offline));
+    this.lease = lease(this.credentials.socket, `kotoba:${this.credentials.document_id}`);
+    this.join();
+    if (!navigator.onLine) this.offline();
     this.refreshTimer = setInterval(() => { if (this.connected) void this.refreshCredentials(); }, 180_000);
     const compositionEnd = (): void => { setTimeout(() => { if (!this.disposed && !this.failure) { this.render(); this.send(); this.awareness(); } }, 0); };
     this.host.editable.addEventListener("compositionend", compositionEnd);
@@ -122,8 +118,38 @@ class Client implements Collaboration {
     (this.host.element as HTMLElement & { kotobaCollab?: Collaboration }).kotobaCollab = this;
   }
 
+  // A channel of its own on the leased socket. Handlers of a channel this client has replaced do nothing.
+  private join(): void {
+    const channel = this.lease!.socket.channel(`kotoba:${this.credentials.document_id}`, () => ({ token: this.credentials.token, session: this.persistence.session, pending: this.pending.map(transaction => transaction.id) }));
+    this.channel = channel;
+    const current = (): boolean => this.channel === channel && !this.disposed;
+    channel.on("transaction", payload => { if (current()) this.receive(payload as Transaction); });
+    channel.on("presence", payload => { if (current()) this.presence.receive((payload as { people: Person[] }).people); });
+    channel.onError(() => { if (current()) this.offline(); });
+    channel.onClose(() => { if (current()) this.offline(); });
+    channel.join()
+      .receive("ok", payload => { if (current()) this.joined(payload as Join); })
+      .receive("error", payload => {
+        if (!current()) return;
+        const reason = (payload as { reason?: string }).reason;
+        if (reason === "expired") void this.refreshCredentials();
+        // The server still counts a channel that just left this socket; Phoenix joins again shortly.
+        else if (reason === "too many channels joined") this.offline();
+        else this.fail("Access to this shared document is unavailable. Your local draft is preserved.");
+      })
+      .receive("timeout", () => { if (current()) this.offline(); });
+  }
+
+  // Recovers this editor alone: other editors keep the socket and their channels.
+  private rejoin(): void {
+    if (this.disposed || !this.lease) return;
+    this.offline();
+    this.channel.leave();
+    this.join();
+  }
+
   private joined(payload: Join): void {
-    if (this.disposed) return;
+    if (this.disposed || this.failure) return;
     if (this.pending.length > 0 && this.accepted?.epoch !== payload.state.epoch) { this.fail("The shared document changed. Your local draft is preserved."); return; }
     this.connected = true;
     this.lastAwareness = "";
@@ -148,7 +174,7 @@ class Client implements Collaboration {
     if (!this.accepted || this.failure || this.disposed || event.epoch !== this.accepted.epoch) return;
     const revision = event.revision ?? 0;
     if (revision <= this.accepted.revision && !this.pending.some(transaction => transaction.id === event.id)) return;
-    if (revision > this.accepted.revision + 1) { this.offline(); this.socket.disconnect(); this.socket.connect(); return; }
+    if (revision > this.accepted.revision + 1) { this.rejoin(); return; }
     if (revision > this.accepted.revision) {
       this.accepted = apply(this.accepted, event.ops);
       this.accepted.revision = revision;
@@ -210,7 +236,8 @@ class Client implements Collaboration {
     this.persist();
     void this.persistenceChain.then(() => {
       if (!this.connected || this.disposed || this.inFlight !== transaction.id) return;
-      this.channel.push("transaction", transaction, 15_000)
+      const channel = this.channel;
+      channel.push("transaction", transaction, 15_000)
         .receive("ok", payload => {
           const event = payload as Transaction & { duplicate?: boolean };
           if (!event.duplicate) this.receive(event);
@@ -226,7 +253,7 @@ class Client implements Collaboration {
           }
         })
         .receive("error", payload => { console.error("Kotoba collaboration rejected transaction:", (payload as { reason?: string }).reason); this.fail("The server could not save your edits. Your local draft is preserved."); })
-        .receive("timeout", () => { this.inFlight = null; this.offline(); this.socket.disconnect(); this.socket.connect(); });
+        .receive("timeout", () => { if (this.channel === channel && this.inFlight === transaction.id) this.rejoin(); });
     });
   }
 
@@ -353,6 +380,7 @@ class Client implements Collaboration {
   }
 
   dispose(): void {
+    if (this.disposed) return;
     this.disposed = true;
     clearTimeout(this.sendTimer);
     clearTimeout(this.awarenessTimer);
@@ -360,8 +388,7 @@ class Client implements Collaboration {
     this.persist();
     this.waiters.splice(0).forEach(waiter => waiter.reject(new Error("The editor closed")));
     this.cleanups.reverse().forEach(cleanup => cleanup());
-    this.channel.leave();
-    this.socket.disconnect();
+    if (this.lease) { this.channel.leave(); this.lease.release(); }
     this.presence.dispose();
     this.bar.remove();
     this.revisionInput.remove();

@@ -137,6 +137,13 @@ document/presence broadcasts. A signed `:read` role cannot transact, even
 when the browser enables contenteditable. Presence is separate from content
 and never persisted in the document.
 
+The shared editors of a page share one socket per socket URL, each with its
+own channel on it, so a page of many shared editors opens one WebSocket. A
+second editor of the same document on the page, or a 101st editor (Phoenix's
+default `:max_channels_per_transport` is 100), gets another socket. Keep
+the collaboration socket's `:max_channels_per_transport` at 100 or above: an
+editor whose join a smaller limit refuses waits for room on that socket.
+
 ## LiveView and forms
 
 Authorize the authenticated user before signing credentials:
