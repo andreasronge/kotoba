@@ -78,6 +78,10 @@ jobs:
   floor:
     runs-on: ubuntu-latest
 
+    # The oldest Phoenix (1.7) and LiveView (1.1) that Kotoba supports.
+    env:
+      KOTOBA_OLDEST: "1"
+
     steps:
       - uses: actions/checkout@v4
 
@@ -93,14 +97,17 @@ jobs:
           path: |
             deps
             _build
-          key: mix-floor-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('mix.lock') }}
+          key: mix-oldest-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-${{ hashFiles('mix.lock') }}
           restore-keys: |
-            mix-floor-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-
+            mix-oldest-${{ steps.beam.outputs.elixir-version }}-${{ steps.beam.outputs.otp-version }}-
 
       - name: Seed fake assets
         run: |
           mkdir -p priv/static
           touch priv/static/kotoba.esm.js priv/static/kotoba.cjs.js priv/static/kotoba-collab.esm.js priv/static/kotoba-collab.cjs.js priv/static/kotoba.css priv/static/kotoba-sumi.css
+
+      # mix.lock has the newest Phoenix and LiveView: resolve the oldest.
+      - run: mix deps.update phoenix phoenix_live_view
 
       - run: mix deps.get
 

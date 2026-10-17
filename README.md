@@ -58,8 +58,9 @@ them.
 ## Install
 
 Kotoba needs Elixir 1.18 or later (it uses the built-in `JSON` module),
-Phoenix 1.8 and Phoenix LiveView 1.2. CI runs the tests on Elixir 1.18
-(OTP 27) in a separate `floor` job, as well as on the current version.
+Phoenix 1.7 or 1.8 and Phoenix LiveView 1.1 or later. CI runs the tests
+on the current versions, and in a separate `floor` job on the oldest:
+Elixir 1.18 (OTP 27), Phoenix 1.7 and LiveView 1.1.
 
 Add `kotoba` to the deps in `mix.exs`:
 

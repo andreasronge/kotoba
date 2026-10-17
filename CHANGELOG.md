@@ -7,6 +7,15 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-10-17
+
+### Changed
+
+- Kotoba supports Phoenix 1.7 and Phoenix LiveView 1.1 (it needed Phoenix
+  1.8 and LiveView 1.2): it requires `~> 1.7.14 or ~> 1.8` and `~> 1.1`.
+  Nothing changes for an app on the newer versions. The floor job of CI
+  runs the tests on Elixir 1.18 with Phoenix 1.7 and LiveView 1.1.
+
 ### Fixed
 
 - A colleague's edit in a shared editor no longer takes the focus and the
@@ -285,7 +294,8 @@ The first release.
 - Guides: quickstart, forms, uploads, prompts, custom nodes, theming,
   security, accessibility and known limits.
 
-[Unreleased]: https://github.com/hattoriai/kotoba/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/hattoriai/kotoba/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/hattoriai/kotoba/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hattoriai/kotoba/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hattoriai/kotoba/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/hattoriai/kotoba/releases/tag/v0.1.0

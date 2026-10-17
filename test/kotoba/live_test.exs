@@ -357,6 +357,7 @@ defmodule Kotoba.LiveTest do
       assert File.read!(Path.join(root, key)) == @png
     end
 
+    @tag :multi_upload
     test "stores files that finish one after the other, each once", %{view: view} do
       upload =
         file_input(view, "#post-form", :attachments, [

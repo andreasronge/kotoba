@@ -1,6 +1,7 @@
 # Quickstart
 
-This guide adds a rich-text field to a Phoenix 1.8 app with LiveView 1.2.
+This guide adds a rich-text field to a Phoenix 1.8 app with LiveView 1.2
+(Kotoba also runs on Phoenix 1.7 and LiveView 1.1).
 At the end, a LiveView form has a Kotoba editor, the schema stores the
 document, and a page shows the stored content as safe HTML.
 
@@ -54,6 +55,9 @@ const liveSocket = new LiveSocket("/live", Socket, {
   hooks: {...colocatedHooks, Kotoba},
 })
 ```
+
+(An app made with Phoenix 1.7 has no `colocatedHooks`: its hooks are
+`{Kotoba}`, with the app's own hooks.)
 
 Put the CSS lines below the other `@import` lines of `app.css` (the
 installer puts them there):
