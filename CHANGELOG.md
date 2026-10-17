@@ -67,6 +67,14 @@ Full Markdown. This release has breaking changes, listed under Changed.
   table, reads as an item with line breaks and the blocks after the list:
   a Lexical list item holds inline content only.
 
+### Security
+
+- The lock file of the repository has bandit 1.13.1 (for CVE-2026-105659
+  and CVE-2026-105660) and decimal 3.2.0 (for CVE-2026-97853). The Hex
+  package does not have the lock file: an app gets these fixes with
+  `mix deps.update bandit decimal`. Bandit is for the development server
+  of Kotoba only. Kotoba does not call `Decimal.round/3`.
+
 ## [0.2.2] - 2026-10-17
 
 ### Changed
