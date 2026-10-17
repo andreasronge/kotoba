@@ -56,7 +56,7 @@ defmodule Kotoba.Nodes.Table do
         {[], rows} -> {[], rows}
       end
 
-    [markdown_row(header, columns), "|" <> String.duplicate(" --- |", columns)]
+    [markdown_row(header, columns), separator(node, columns)]
     |> Kernel.++(Enum.map(rows, &markdown_row(&1, columns)))
     |> Enum.join("\n")
   end
@@ -65,6 +65,27 @@ defmodule Kotoba.Nodes.Table do
   # joins them with a tab, which no cell has (see `TableCell`).
   defp row_cells({%TableRow{}, markdown}) when markdown != "", do: String.split(markdown, "\t")
   defp row_cells(_other), do: []
+
+  # The alignment of each column is the alignment of its cell in the first
+  # row (see `TableCell.align/1`).
+  defp separator(node, columns) do
+    aligns =
+      case node.children do
+        [%TableRow{children: cells} | _rest] -> Enum.map(cells, &TableCell.align/1)
+        _other -> []
+      end
+
+    aligns
+    |> Kernel.++(List.duplicate(nil, columns))
+    |> Enum.take(columns)
+    |> Enum.map_join(fn
+      "left" -> " :-- |"
+      "center" -> " :-: |"
+      "right" -> " --: |"
+      nil -> " --- |"
+    end)
+    |> then(&("|" <> &1))
+  end
 
   defp markdown_row(cells, columns) do
     cells = cells ++ List.duplicate("", columns - length(cells))

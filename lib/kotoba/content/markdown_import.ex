@@ -1,52 +1,37 @@
 defmodule Kotoba.Content.MarkdownImport do
   @moduledoc false
-  # A small Markdown to Lexical root converter for
-  # `Kotoba.Content.from_markdown/2`. It reads what Kotoba's own Markdown
-  # writes (see `Kotoba.Renderer.to_markdown/2`), and the common GitHub
-  # Flavored Markdown around it:
+  # Markdown to a Lexical root, for `Kotoba.Content.from_markdown/2` and
+  # pasted Markdown. MDEx (comrak, a port of GitHub's cmark-gfm) parses
+  # CommonMark and GitHub Flavored Markdown: tables, task lists,
+  # strikethrough, autolinks and footnotes. This module maps its tree to
+  # the nodes of the editor.
   #
-  #   * paragraphs, `#` headings, `>` quotes, horizontal rules (`---`,
-  #     `***`, `___`), fenced code blocks;
-  #   * `-`/`*`/`1.` lists (one level; a numbered list keeps its first
-  #     number), `- [ ]`/`- [x]` check lists;
-  #   * pipe tables, with a header row;
-  #   * the inline `**bold**`, `*italic*`/`_italic_`, `***both***`,
-  #     `~~strikethrough~~`, `` `code` `` and `[text](url)`, which nest
-  #     (a link in bold, bold in a link).
+  # Raw HTML becomes its text: Kotoba never passes HTML through.
   #
-  # Anything else becomes plain paragraph text.
+  # A construct whose feature is off becomes its closest form, with no text
+  # lost: a heading becomes a paragraph, a quote its blocks, a list its
+  # items as paragraphs, a code block its lines, a table one paragraph for
+  # each row, an image its alternative text, a footnote its `[^label]`
+  # text, and a format is dropped.
+  #
+  # A list item holds inline content and one nested list. In an item with
+  # more than one paragraph, the paragraphs are joined with line breaks; a
+  # code block, a quote, a table or a heading in an item ends the list,
+  # comes after it, and the list goes on after it.
 
   import Bitwise
 
-  @heading ~r/\A(#+)\s+(.*)\z/
-  @fence ~r/\A```(\w*)\s*\z/
-  @rule ~r/\A {0,3}([-*_])(?:[ \t]*\1){2,}[ \t]*\z/
-  @quote ~r/\A {0,3}> ?(.*)\z/
-  @check ~r/\A[-*]\s+\[([ xX])\]\s+(.*)\z/
-  @bullet ~r/\A[-*]\s+(.*)\z/
-  @numbered ~r/\A(\d+)\.\s+(.*)\z/
-  @table_row ~r/\A\s*\|.*\|\s*\z/
-  @table_separator ~r/\A\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*\z/
+  alias Kotoba.Features
 
-  # The first match from the left wins, and at one place the first
-  # alternative: `***` before `**` before `*`.
-  #
-  # `_italic_` requires a non-word character (or a string edge) on each
-  # side, so `snake_case_name` is not read as emphasis; `*italic*` requires
-  # text that does not start or end with a space, so `2 * 3 * 4` is not.
-  # `url` allows one level of balanced parentheses, so a Wikipedia-style URL
-  # is not cut at the first `)`.
-  @inline ~r/
-    `(?<code>[^`]+)`
-    |\[(?<text>[^\]]*)\]\((?<url>(?:[^()\s]|\([^()\s]*\))+)\)
-    |\*\*\*(?<both>[^*]+)\*\*\*
-    |\*\*(?<bold>.+?)\*\*
-    |~~(?<strike>.+?)~~
-    |(?<![\w*])\*(?<star>[^\s*](?:[^*]*[^\s*])?)\*(?![\w*])
-    |(?<!\w)_(?<italic>[^_]+)_(?!\w)
-  /x
-
-  @inline_names Regex.names(@inline)
+  @parse_options [
+    extension: [
+      strikethrough: true,
+      table: true,
+      autolink: true,
+      tasklist: true,
+      footnotes: true
+    ]
+  ]
 
   @bold 1
   @italic 2
@@ -54,266 +39,360 @@ defmodule Kotoba.Content.MarkdownImport do
   @code 16
 
   @doc "Returns the root node JSON for a Markdown string."
-  @spec root(String.t()) :: map()
-  def root(markdown) do
-    children = markdown |> String.split(~r/\r\n|\r|\n/) |> blocks([])
-    element("root", children)
+  @spec root(String.t(), keyword()) :: map()
+  def root(markdown, opts \\ []) do
+    features = opts |> Keyword.get(:features, Features.all()) |> Features.names!() |> MapSet.new()
+    document = MDEx.parse_document!(markdown, @parse_options)
+    element("root", blocks(document.nodes, features))
   end
 
-  defp blocks([], acc), do: Enum.reverse(acc)
+  # -- blocks ----------------------------------------------------------------
 
-  defp blocks([line | rest] = lines, acc) do
-    if String.trim(line) == "" do
-      blocks(rest, acc)
+  defp blocks(nodes, features), do: Enum.flat_map(nodes, &block(&1, features))
+
+  # A paragraph of one non-breaking space (`&nbsp;`) is a blank line, as
+  # `Kotoba.Renderer.to_markdown/2` writes it: an empty paragraph.
+  defp block(%MDEx.Paragraph{nodes: nodes}, features) do
+    case inline(nodes, features) do
+      [%{"type" => "text", "text" => "\u00A0"}] -> [paragraph([])]
+      children -> [paragraph(children)]
+    end
+  end
+
+  defp block(%MDEx.Heading{level: level, nodes: nodes}, features) do
+    if on?(features, :headings),
+      do: [element("heading", inline(nodes, features), %{"tag" => "h#{level}"})],
+      else: [paragraph(inline(nodes, features))]
+  end
+
+  defp block(%MDEx.ThematicBreak{}, features) do
+    if on?(features, :horizontal_rules),
+      do: [%{"type" => "horizontalrule", "version" => 1}],
+      else: []
+  end
+
+  defp block(%MDEx.CodeBlock{info: info, literal: literal}, features) do
+    lines = literal |> String.replace_suffix("\n", "") |> String.split("\n")
+
+    if on?(features, :code_blocks) do
+      code = element("code", lines_with_breaks(lines))
+
+      case info |> to_string() |> String.split() do
+        [language | _rest] -> [Map.put(code, "language", language)]
+        [] -> [code]
+      end
     else
-      dispatch_block(lines, acc)
+      [paragraph(lines_with_breaks(lines))]
     end
   end
 
-  defp dispatch_block([line | rest] = lines, acc) do
-    cond do
-      match = Regex.run(@fence, line, capture: :all_but_first) ->
-        {code, rest} = code_block(rest, match)
-        blocks(rest, [code | acc])
+  defp block(%MDEx.HtmlBlock{literal: literal}, _features) do
+    literal
+    |> String.replace_suffix("\n", "")
+    |> String.split("\n")
+    |> lines_with_breaks()
+    |> paragraph()
+    |> List.wrap()
+  end
 
-      Regex.match?(@heading, line) ->
-        blocks(rest, [heading(line) | acc])
+  defp block(%MDEx.BlockQuote{nodes: nodes}, features) do
+    if on?(features, :quotes),
+      do: [element("quote", blocks(nodes, features), %{"shadowRoot" => true})],
+      else: blocks(nodes, features)
+  end
 
-      Regex.match?(@rule, line) ->
-        blocks(rest, [%{"type" => "horizontalrule", "version" => 1} | acc])
+  defp block(%MDEx.List{} = list, features), do: list(list, features)
 
-      table_start?(lines) ->
-        {table, rest} = table_block(lines)
-        blocks(rest, [table | acc])
+  defp block(%MDEx.Table{} = table, features), do: table(table, features)
 
-      Regex.match?(@quote, line) ->
-        {quote, rest} = quote_block(lines)
-        blocks(rest, [quote | acc])
+  defp block(%MDEx.FootnoteDefinition{name: name, nodes: nodes}, features) do
+    if on?(features, :footnotes) do
+      [element("footnotedefinition", blocks(nodes, features), %{"label" => name})]
+    else
+      label = text_node("[^" <> name <> "]: ")
 
-      item_kind(line) != nil ->
-        {list, rest} = list_block(lines)
-        blocks(rest, [list | acc])
+      case blocks(nodes, features) do
+        [%{"type" => "paragraph"} = first | rest] ->
+          [%{first | "children" => [label | first["children"]]} | rest]
 
-      true ->
-        {paragraph, rest} = paragraph_block(lines)
-        blocks(rest, [paragraph | acc])
+        blocks ->
+          [paragraph([label]) | blocks]
+      end
     end
   end
 
-  # -- code ------------------------------------------------------------
+  # A construct of an extension that is not on (none today) gives its text.
+  defp block(%{nodes: nodes}, features), do: blocks(nodes, features)
+  defp block(_node, _features), do: []
 
-  defp code_block(lines, [language]) do
-    {body, rest} = Enum.split_while(lines, &(not Regex.match?(@fence, &1)))
-    rest = drop_fence(rest)
-
-    # A blank line in the fence gets a line break with no text node either
-    # side of it, not an empty text node.
-    children =
-      body
-      |> Enum.map(&if(&1 == "", do: [], else: [text_node(&1)]))
-      |> Enum.intersperse([linebreak_node()])
-      |> List.flatten()
-
-    code = element("code", children)
-    code = if language == "", do: code, else: Map.put(code, "language", language)
-    {code, rest}
+  defp lines_with_breaks(lines) do
+    lines
+    |> Enum.map(&if(&1 == "", do: [], else: [text_node(&1)]))
+    |> Enum.intersperse([linebreak_node()])
+    |> List.flatten()
   end
 
-  defp drop_fence([_close | tail]), do: tail
-  defp drop_fence([]), do: []
+  # -- lists -----------------------------------------------------------------
 
-  # -- headings ----------------------------------------------------------
+  defp list(%MDEx.List{nodes: items} = list, features) do
+    check? = Enum.all?(items, &match?(%MDEx.TaskItem{}, &1)) and on?(features, :check_lists)
 
-  defp heading(line) do
-    [marker, content] = Regex.run(@heading, line, capture: :all_but_first)
-    level = marker |> String.length() |> min(6)
-    element("heading", inline(String.trim(content)), %{"tag" => "h#{level}"})
+    if on?(features, :lists) do
+      {type, tag} =
+        cond do
+          check? -> {"check", "ul"}
+          list.list_type == :ordered -> {"number", "ol"}
+          true -> {"bullet", "ul"}
+        end
+
+      start = if type == "number", do: list.start || 1, else: 1
+      build_list(items, %{type: type, tag: tag, start: start, check?: check?}, features)
+    else
+      Enum.flat_map(items, &item_blocks(&1, features))
+    end
   end
 
-  # -- quotes ------------------------------------------------------------
+  # The items of a list, as a list node. An item with a block that a list
+  # item cannot hold ends the list: the block comes after it, and a new
+  # list (numbered on) holds the next items.
+  defp build_list(items, kind, features) do
+    {lists, current, _number} =
+      Enum.reduce(items, {[], [], kind.start}, fn item, {done, current, number} ->
+        {inline, nested, after_blocks} = item_parts(item, kind, features)
+        checked = if kind.check?, do: %{"checked" => item.checked}, else: %{}
+        li = element("listitem", inline, Map.put(checked, "value", number))
 
-  # The lines that start with `>`; a quote holds inline content, so its
-  # lines are joined with line breaks.
-  defp quote_block(lines) do
-    {quote_lines, rest} = Enum.split_while(lines, &Regex.match?(@quote, &1))
+        nested_li =
+          if nested == [],
+            do: [],
+            else: [element("listitem", nested, %{"value" => number})]
 
-    children =
-      quote_lines
-      |> Enum.map(fn line ->
-        [content] = Regex.run(@quote, line, capture: :all_but_first)
-        inline(String.trim(content))
+        current = current ++ [li | nested_li]
+
+        case after_blocks do
+          [] ->
+            {done, current, number + 1}
+
+          blocks ->
+            {done ++ [list_node(current, kind, number_of(current, kind))] ++ blocks, [],
+             number + 1}
+        end
       end)
-      |> Enum.intersperse([linebreak_node()])
-      |> List.flatten()
 
-    {element("quote", children), rest}
-  end
-
-  # -- lists ---------------------------------------------------------------
-
-  defp item_kind(line) do
-    cond do
-      Regex.match?(@check, line) -> :check
-      Regex.match?(@bullet, line) -> :bullet
-      Regex.match?(@numbered, line) -> :number
-      true -> nil
+    case current do
+      [] -> lists
+      items -> lists ++ [list_node(items, kind, number_of(items, kind))]
     end
   end
 
-  # The items of one kind: a line of another kind starts another list.
-  defp list_block([first | _] = lines) do
-    kind = item_kind(first)
-    {item_lines, rest} = Enum.split_while(lines, &(item_kind(&1) == kind))
-    start = if kind == :number, do: number(first), else: 1
+  defp number_of([%{"value" => value} | _rest], _kind), do: value
 
-    items =
-      item_lines
-      |> Enum.with_index(start)
-      |> Enum.map(fn {line, value} -> list_item(kind, line, value) end)
-
-    tag = if kind == :number, do: "ol", else: "ul"
-
-    list =
-      element("list", items, %{"listType" => to_string(kind), "start" => start, "tag" => tag})
-
-    {list, rest}
+  defp list_node(items, kind, start) do
+    element("list", items, %{
+      "listType" => kind.type,
+      "start" => if(kind.type == "number", do: start, else: 1),
+      "tag" => kind.tag
+    })
   end
 
-  defp number(line) do
-    [digits, _content] = Regex.run(@numbered, line, capture: :all_but_first)
-    String.to_integer(digits)
+  # The inline content of an item, its nested list (as the children of an
+  # item of its own, as Lexical has it) and the blocks that come after the
+  # list.
+  defp item_parts(%{nodes: nodes} = item, kind, features) do
+    prefix = task_prefix(item, kind)
+
+    {inline, nested, after_blocks} =
+      Enum.reduce(nodes, {[], [], []}, fn node, {inline, nested, after_blocks} ->
+        case node do
+          %MDEx.Paragraph{nodes: children} when nested == [] and after_blocks == [] ->
+            {join_lines(inline, inline(children, features)), nested, after_blocks}
+
+          # A nested list that a block split: its first part is the
+          # nested list, and the rest comes after the list.
+          %MDEx.List{} = list when nested == [] and after_blocks == [] ->
+            [first | rest] = list(list, features)
+            {inline, [first], rest}
+
+          %MDEx.ThematicBreak{} when after_blocks == [] ->
+            {inline, nested, after_blocks}
+
+          other ->
+            {inline, nested, after_blocks ++ block(other, features)}
+        end
+      end)
+
+    {prefix ++ inline, nested, after_blocks}
   end
 
-  defp list_item(:check, line, value) do
-    [mark, content] = Regex.run(@check, line, capture: :all_but_first)
-    element("listitem", inline(content), %{"value" => value, "checked" => mark != " "})
-  end
+  defp task_prefix(%MDEx.TaskItem{checked: checked}, %{check?: false}),
+    do: [text_node(if(checked, do: "[x] ", else: "[ ] "))]
 
-  defp list_item(:bullet, line, value) do
-    [content] = Regex.run(@bullet, line, capture: :all_but_first)
-    element("listitem", inline(content), %{"value" => value})
-  end
+  defp task_prefix(_item, _kind), do: []
 
-  defp list_item(:number, line, value) do
-    [_digits, content] = Regex.run(@numbered, line, capture: :all_but_first)
-    element("listitem", inline(content), %{"value" => value})
+  defp join_lines([], next), do: next
+  defp join_lines(inline, next), do: inline ++ [linebreak_node() | next]
+
+  # A list item as blocks, when lists are off.
+  defp item_blocks(%{nodes: nodes} = item, features) do
+    prefix = task_prefix(item, %{check?: false})
+
+    case blocks(nodes, features) do
+      [%{"type" => "paragraph"} = first | rest] ->
+        [%{first | "children" => prefix ++ first["children"]} | rest]
+
+      blocks when prefix != [] ->
+        [paragraph(prefix) | blocks]
+
+      blocks ->
+        blocks
+    end
   end
 
   # -- tables ----------------------------------------------------------------
 
-  # A row of cells, then a separator row (`| --- | :-: |`).
-  defp table_start?([line, separator | _]),
-    do: Regex.match?(@table_row, line) and Regex.match?(@table_separator, separator)
-
-  defp table_start?(_lines), do: false
-
-  defp table_block([header, _separator | lines]) do
-    {body, rest} = Enum.split_while(lines, &Regex.match?(@table_row, &1))
-    width = header |> cells() |> length()
-
-    rows = [
-      table_row(cells(header), width, 1)
-      | Enum.map(body, &table_row(cells(&1), width, 0))
-    ]
-
-    {element("table", rows), rest}
-  end
-
-  # Every row has the width of the header row: a short row gets empty
-  # cells, and the cells of a long row past it are dropped.
-  defp table_row(cells, width, header_state) do
-    cells =
-      cells
-      |> Enum.take(width)
-      |> then(&(&1 ++ List.duplicate("", width - length(&1))))
-      |> Enum.map(fn text ->
-        paragraph = element("paragraph", inline(text), %{"textFormat" => 0, "textStyle" => ""})
-
-        element("tablecell", [paragraph], %{
-          "headerState" => header_state,
-          "colSpan" => 1,
-          "rowSpan" => 1
-        })
+  defp table(%MDEx.Table{nodes: rows, alignments: alignments}, features) do
+    if on?(features, :tables) do
+      [element("table", Enum.map(rows, &table_row(&1, alignments, features)))]
+    else
+      Enum.map(rows, fn %MDEx.TableRow{nodes: cells} ->
+        cells
+        |> Enum.map(&inline(&1.nodes, features))
+        |> Enum.intersperse([
+          %{
+            "type" => "tab",
+            "detail" => 2,
+            "format" => 0,
+            "mode" => "normal",
+            "style" => "",
+            "text" => "\t",
+            "version" => 1
+          }
+        ])
+        |> List.flatten()
+        |> paragraph()
       end)
-
-    element("tablerow", cells)
+    end
   end
 
-  # The cells of a row: split at the `|` that are not escaped (`\|`).
-  defp cells(line) do
-    line
-    |> String.trim()
-    |> String.replace(~r/\A\|/, "")
-    |> String.replace(~r/(?<!\\)\|\z/, "")
-    |> String.split(~r/(?<!\\)\|/)
-    |> Enum.map(&(&1 |> String.replace("\\|", "|") |> String.trim()))
+  defp table_row(%MDEx.TableRow{header: header, nodes: cells}, alignments, features) do
+    cells
+    |> Enum.with_index()
+    |> Enum.map(fn {%MDEx.TableCell{nodes: nodes}, index} ->
+      format = alignments |> Enum.at(index) |> align()
+      cell_paragraph = Map.put(paragraph(inline(nodes, features)), "format", format)
+
+      element("tablecell", [cell_paragraph], %{
+        "headerState" => if(header, do: 1, else: 0),
+        "colSpan" => 1,
+        "rowSpan" => 1
+      })
+    end)
+    |> then(&element("tablerow", &1))
   end
 
-  # -- paragraphs ------------------------------------------------------------
-
-  defp paragraph_block(lines) do
-    {para_lines, rest} = Enum.split_while(lines, &plain_line?/1)
-
-    children =
-      para_lines
-      |> Enum.map(&inline(String.trim(&1)))
-      |> Enum.intersperse([linebreak_node()])
-      |> List.flatten()
-
-    {element("paragraph", children, %{"textFormat" => 0, "textStyle" => ""}), rest}
-  end
-
-  defp plain_line?(line) do
-    String.trim(line) != "" and not Regex.match?(@fence, line) and
-      not Regex.match?(@heading, line) and not Regex.match?(@rule, line) and
-      not Regex.match?(@quote, line) and item_kind(line) == nil
-  end
+  defp align(alignment) when alignment in [:left, :center, :right], do: Atom.to_string(alignment)
+  defp align(_alignment), do: ""
 
   # -- inline ----------------------------------------------------------------
 
-  defp inline(text, format \\ 0)
+  defp inline(nodes, features), do: nodes |> inline(features, 0) |> merge_text()
 
-  defp inline("", _format), do: []
+  defp inline(nodes, features, format) when is_list(nodes),
+    do: Enum.flat_map(nodes, &inline_node(&1, features, format))
 
-  defp inline(text, format) do
-    case Regex.run(@inline, text, capture: [0 | @inline_names], return: :index) do
-      nil ->
-        [text_node(text, format)]
+  # A line ending in text (from `&#10;`) is white space in HTML.
+  defp inline_node(%MDEx.Text{literal: literal}, _features, format),
+    do: [text_node(String.replace(literal, ~r/\r\n|\r|\n/, " "), format)]
 
-      [{start, len} | group_indices] ->
-        before = binary_part(text, 0, start)
-        rest = binary_part(text, start + len, byte_size(text) - start - len)
-        captures = @inline_names |> Enum.zip(group_indices) |> Map.new(&capture(text, &1))
-        before_nodes = if before == "", do: [], else: [text_node(before, format)]
-        before_nodes ++ token(captures, format) ++ inline(rest, format)
-    end
-  end
+  defp inline_node(%MDEx.SoftBreak{}, _features, format), do: [text_node(" ", format)]
+  defp inline_node(%MDEx.LineBreak{}, _features, _format), do: [linebreak_node()]
 
-  # `return: :index` gives byte offsets.
-  defp capture(_text, {name, {-1, 0}}), do: {name, ""}
-  defp capture(text, {name, {start, len}}), do: {name, binary_part(text, start, len)}
+  defp inline_node(%MDEx.HtmlInline{literal: literal}, _features, format),
+    do: [text_node(literal, format)]
 
-  # A link with no text (`[](url)`) gives no node at all, rather than an
-  # empty anchor.
-  defp token(captures, format) do
+  defp inline_node(%MDEx.Emph{nodes: nodes}, features, format),
+    do: inline(nodes, features, with_format(format, features, :italic, @italic))
+
+  defp inline_node(%MDEx.Strong{nodes: nodes}, features, format),
+    do: inline(nodes, features, with_format(format, features, :bold, @bold))
+
+  defp inline_node(%MDEx.Strikethrough{nodes: nodes}, features, format),
+    do: inline(nodes, features, with_format(format, features, :strikethrough, @strikethrough))
+
+  defp inline_node(%MDEx.Code{literal: literal}, features, format),
+    do: [text_node(literal, with_format(format, features, :inline_code, @code))]
+
+  defp inline_node(%MDEx.Link{url: url, title: title, nodes: nodes}, features, format) do
+    children = inline(nodes, features, format) |> merge_text()
+
     cond do
-      present?(captures["code"]) -> [text_node(captures["code"], format ||| @code)]
-      present?(captures["url"]) -> link(captures["text"], captures["url"], format)
-      present?(captures["both"]) -> inline(captures["both"], format ||| @bold ||| @italic)
-      present?(captures["bold"]) -> inline(captures["bold"], format ||| @bold)
-      present?(captures["strike"]) -> inline(captures["strike"], format ||| @strikethrough)
-      present?(captures["star"]) -> inline(captures["star"], format ||| @italic)
-      present?(captures["italic"]) -> inline(captures["italic"], format ||| @italic)
-      true -> []
+      not on?(features, :links) -> children
+      children == [] -> []
+      true -> [link_node(url, title, children)]
     end
   end
 
-  defp link("", _url, _format), do: []
-  defp link(text, url, format), do: [link_node(url, inline(text, format))]
+  defp inline_node(%MDEx.Image{url: url, title: title, nodes: nodes}, features, format) do
+    alt = plain_text(nodes)
 
+    if on?(features, :images) do
+      image = %{"type" => "image", "url" => url, "alt" => alt, "version" => 1}
+      [if(present?(title), do: Map.put(image, "title", title), else: image)]
+    else
+      if alt == "", do: [], else: [text_node(alt, format)]
+    end
+  end
+
+  defp inline_node(%MDEx.FootnoteReference{name: name}, features, format) do
+    if on?(features, :footnotes),
+      do: [%{"type" => "footnotereference", "label" => name, "version" => 1}],
+      else: [text_node("[^" <> name <> "]", format)]
+  end
+
+  defp inline_node(%{nodes: nodes}, features, format), do: inline(nodes, features, format)
+
+  defp inline_node(%{literal: literal}, _features, format) when is_binary(literal),
+    do: [text_node(literal, format)]
+
+  defp inline_node(_node, _features, _format), do: []
+
+  defp with_format(format, features, feature, bit),
+    do: if(on?(features, feature), do: format ||| bit, else: format)
+
+  # The text of inline nodes, for the alternative text of an image.
+  defp plain_text(nodes) do
+    Enum.map_join(nodes, fn
+      %MDEx.Text{literal: literal} -> literal
+      %MDEx.Code{literal: literal} -> literal
+      %MDEx.SoftBreak{} -> " "
+      %MDEx.LineBreak{} -> " "
+      %{nodes: nodes} -> plain_text(nodes)
+      _other -> ""
+    end)
+  end
+
+  # Adjacent text nodes with the same format are one node, as Lexical
+  # normalizes them.
+  defp merge_text(nodes) do
+    nodes
+    |> Enum.reduce([], fn
+      %{"type" => "text", "format" => format, "text" => text},
+      [%{"type" => "text", "format" => format} = previous | rest] ->
+        [%{previous | "text" => previous["text"] <> text} | rest]
+
+      node, acc ->
+        [node | acc]
+    end)
+    |> Enum.reverse()
+  end
+
+  defp on?(features, feature), do: MapSet.member?(features, feature)
   defp present?(value), do: value not in [nil, ""]
 
   # -- JSON builders -----------------------------------------------------
+
+  defp paragraph(children),
+    do: element("paragraph", children, %{"textFormat" => 0, "textStyle" => ""})
 
   defp element(type, children, attrs \\ %{}) do
     Map.merge(
@@ -343,7 +422,12 @@ defmodule Kotoba.Content.MarkdownImport do
 
   defp linebreak_node, do: %{"type" => "linebreak", "version" => 1}
 
-  defp link_node(url, children) do
-    element("link", children, %{"url" => url, "rel" => nil, "target" => nil, "title" => nil})
+  defp link_node(url, title, children) do
+    element("link", children, %{
+      "url" => url,
+      "rel" => nil,
+      "target" => nil,
+      "title" => if(present?(title), do: String.replace(title, ~r/\s+/, " "))
+    })
   end
 end

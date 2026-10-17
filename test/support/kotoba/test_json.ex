@@ -91,6 +91,16 @@ defmodule Kotoba.TestJSON do
     %{"type" => "mention", "version" => 1, "kind" => kind, "id" => id, "label" => label}
   end
 
+  def image(url, alt \\ "", attrs \\ %{}) do
+    Map.merge(%{"type" => "image", "version" => 1, "url" => url, "alt" => alt}, attrs)
+  end
+
+  def footnote_reference(label),
+    do: %{"type" => "footnotereference", "version" => 1, "label" => label}
+
+  def footnote_definition(label, children),
+    do: element("footnotedefinition", children, %{"label" => label})
+
   def attachment(attrs \\ %{}) do
     Map.merge(
       %{

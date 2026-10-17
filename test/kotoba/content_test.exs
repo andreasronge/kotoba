@@ -234,8 +234,13 @@ defmodule Kotoba.ContentTest do
       assert Content.from_markdown("Hello there.").text == "Hello there."
     end
 
-    test "a multi-line paragraph becomes one block with line breaks" do
-      assert Content.from_markdown("Line one\nLine two").text == "Line one\nLine two"
+    test "the lines of a paragraph are one line, as CommonMark has them" do
+      assert Content.from_markdown("Line one\nLine two").text == "Line one Line two"
+    end
+
+    test "a line that ends with two spaces or a backslash ends with a line break" do
+      assert Content.from_markdown("Line one  \nLine two").text == "Line one\nLine two"
+      assert Content.from_markdown("Line one\\\nLine two").text == "Line one\nLine two"
     end
 
     test "a heading" do
@@ -325,9 +330,11 @@ defmodule Kotoba.ContentTest do
       assert Content.from_markdown("***both***").html == "<p><strong><em>both</em></strong></p>"
     end
 
-    test "a quote, over several lines" do
-      content = Content.from_markdown("> one\n> two\n\nafter")
-      assert content.html == "<blockquote>one<br>two</blockquote><p>after</p>"
+    test "a quote holds blocks" do
+      content = Content.from_markdown("> one\n> two\n>\n> - a\n\nafter")
+
+      assert content.html ==
+               "<blockquote><p>one two</p><ul><li>a</li></ul></blockquote><p>after</p>"
     end
 
     test "a check list" do
@@ -356,10 +363,10 @@ defmodule Kotoba.ContentTest do
       content = Content.from_markdown("| A | B |\n| --- | :-: |\n| 1 | **2** |")
 
       assert content.html =~
-               ~s(<thead><tr><th scope="col"><p>A</p></th><th scope="col"><p>B</p></th></tr></thead>)
+               ~s(<thead><tr><th scope="col"><p>A</p></th><th scope="col" class="kotoba-align-center"><p>B</p></th></tr></thead>)
 
       assert content.html =~
-               "<tbody><tr><td><p>1</p></td><td><p><strong>2</strong></p></td></tr></tbody>"
+               ~s(<tbody><tr><td><p>1</p></td><td class="kotoba-align-center"><p><strong>2</strong></p></td></tr></tbody>)
     end
 
     test "Kotoba's own Markdown reads back to the same HTML" do

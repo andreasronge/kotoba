@@ -32,18 +32,42 @@ defmodule Kotoba.Nodes.List do
 
   @impl Kotoba.Node
   def render_markdown(node, opts) do
+    other = other_marker?(node, opts)
+
     node
     |> Renderer.markdown_each(opts)
     |> Enum.filter(fn {item, _markdown} -> match?(%ListItem{}, item) end)
     |> Enum.with_index()
-    |> Enum.map_join("\n", fn {{item, markdown}, index} -> item(node, item, index, markdown) end)
+    |> Enum.map_join("\n", fn {{item, markdown}, index} ->
+      item(node, item, index, markdown, other)
+    end)
   end
 
-  defp item(node, item, index, markdown) do
+  # Two lists in a row with the same marker would be one list in Markdown:
+  # every other one gets the other marker (`*` for `-`, `)` for `.`).
+  defp other_marker?(node, opts) do
+    with %{children: siblings} <- opts[:parent],
+         index when is_integer(index) <- opts[:index] do
+      siblings
+      |> Enum.take(index)
+      |> Enum.reverse()
+      |> Enum.take_while(&(is_struct(&1, __MODULE__) and numbered?(&1) == numbered?(node)))
+      |> length()
+      |> rem(2) == 1
+    else
+      _other -> false
+    end
+  end
+
+  defp numbered?(list), do: list.list_type == "number"
+
+  defp item(node, item, index, markdown, other) do
     marker =
-      case node.list_type do
-        "number" -> "#{node.start + index}. "
-        _other -> "- "
+      case {node.list_type, other} do
+        {"number", false} -> "#{node.start + index}. "
+        {"number", true} -> "#{node.start + index}) "
+        {_type, false} -> "- "
+        {_type, true} -> "* "
       end
 
     indent = String.duplicate(" ", String.length(marker))

@@ -67,7 +67,8 @@ defmodule Kotoba.NodesTest do
     assert Map.keys(registry) |> Enum.sort() ==
              Enum.sort(
                ~w(root paragraph heading quote list listitem text tab linebreak link autolink code
-                          code-highlight horizontalrule attachment gallery mention table tablerow tablecell)
+                          code-highlight horizontalrule attachment gallery mention table tablerow tablecell
+                          image footnotereference footnotedefinition)
              )
 
     assert registry["listitem"] == Nodes.ListItem

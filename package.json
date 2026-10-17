@@ -1,6 +1,6 @@
 {
   "name": "kotoba",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "license": "MIT",
   "module": "./priv/static/kotoba.esm.js",
   "main": "./priv/static/kotoba.cjs.js",

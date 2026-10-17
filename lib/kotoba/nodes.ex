@@ -42,7 +42,10 @@ defmodule Kotoba.Nodes do
     Nodes.TableCell,
     Nodes.Attachment,
     Nodes.Gallery,
-    Nodes.Mention
+    Nodes.Mention,
+    Nodes.Image,
+    Nodes.FootnoteReference,
+    Nodes.FootnoteDefinition
   ]
 
   # The editor's own node types: a node for a type it does not know, and

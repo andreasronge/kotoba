@@ -99,7 +99,7 @@ defmodule Kotoba.Nodes.Text do
       [:code]
 
   """
-  @spec formats(integer() | %{format: integer()}) :: [format()]
+  @spec formats(integer() | %{:format => integer(), optional(atom()) => term()}) :: [format()]
   def formats(%{format: bitmask}), do: formats(bitmask)
 
   def formats(bitmask) when is_integer(bitmask),
@@ -271,14 +271,39 @@ defmodule Kotoba.Nodes.Text do
   def render_markdown(%{text: ""}, _opts), do: ""
 
   def render_markdown(node, _opts) do
-    formats = formats(node)
-
-    text =
-      if :code in formats, do: Markdown.code_span(node.text), else: Markdown.escape(node.text)
+    formats = markdown_formats(node)
 
     @markdown
     |> Enum.filter(fn {format, _marker} -> format in formats end)
     |> Enum.reverse()
-    |> Enum.reduce(text, fn {_format, marker}, inner -> Markdown.wrap(inner, marker) end)
+    |> Enum.reduce(markdown_body(node), fn {_format, marker}, inner ->
+      Markdown.wrap(inner, marker)
+    end)
   end
+
+  @doc """
+  Returns the formats of the text that Markdown has markers for, in the
+  order of their markers: `:bold`, `:italic` and `:strikethrough`. Inline
+  code is the body itself (see `markdown_body/1`).
+  """
+  @spec markdown_formats(t()) :: [atom()]
+  def markdown_formats(node) do
+    formats = formats(node)
+    for {format, _marker} <- @markdown, format in formats, do: format
+  end
+
+  @doc """
+  Returns the Markdown of the text with no format markers: a code span for
+  inline code, else the escaped text.
+  """
+  @spec markdown_body(t()) :: String.t()
+  def markdown_body(node) do
+    if :code in formats(node),
+      do: Markdown.code_span(node.text),
+      else: Markdown.escape(node.text)
+  end
+
+  @doc "Returns the Markdown marker of a format of `markdown_formats/1`."
+  @spec markdown_marker(atom()) :: String.t()
+  def markdown_marker(format), do: Keyword.fetch!(@markdown, format)
 end

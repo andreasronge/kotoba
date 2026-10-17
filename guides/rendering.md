@@ -124,11 +124,18 @@ Kotoba.Renderer.to_markdown(doc)
 ```
 
 `to_markdown/2` writes headings, lists and check lists, quotes, code
-blocks, bold, italic, strikethrough, inline code, links, images, rules and
-tables (GitHub Flavored Markdown) as Markdown, and escapes the text. Other
+blocks, bold, italic, strikethrough, inline code, links, images, rules,
+tables with their column alignment, and footnotes (GitHub Flavored
+Markdown) as Markdown, and escapes the text, so that
+`Kotoba.Content.from_markdown/2` reads it back to the same document. Other
 formats (underline, highlights, colors, subscript, superscript) and
 mentions give their text. An app node gives what its
 `render_markdown/2` gives.
+
+A blank line that a person typed (an empty paragraph between blocks)
+keeps its height in HTML and is `&nbsp;` in Markdown. To leave blank lines
+out, render with `blank_lines: :collapse`, or give the editor
+`blank_lines={:collapse}`, which leaves them out of the saved document.
 
 For an email, render the HTML with the `:untrusted` policy when the
 content comes from people outside the app, and inline the styles that the
@@ -154,11 +161,14 @@ Kotoba.Features.used(doc)         # the features it uses
 
 * `Kotoba.Content.cast/1` takes the JSON that the editor posts, a
   document envelope, a bare Lexical root node, or a `Kotoba.Content`.
-* `Kotoba.Content.from_markdown/2` makes content from Markdown, on a
-  best-effort basis: paragraphs, `#` headings, `-`, `*` and `1.` lists
-  (one level), fenced code blocks, `**bold**`, `_italic_`, `` `code` ``
-  and `[text](url)`. Anything else is paragraph text. It is handy for
-  seeds, tests and imports.
+* `Kotoba.Content.from_markdown/2` makes content from Markdown:
+  CommonMark and GitHub Flavored Markdown (tables, task lists,
+  strikethrough, autolinks, footnotes), read by MDEx. Raw HTML is text. A
+  list item holds inline content: an item with several paragraphs has
+  line breaks, and a code block, a quote or a table in an item comes after
+  the list. `features:` gives the features of a field: a construct whose
+  feature is off becomes its closest form. It is handy for seeds, tests
+  and imports, and the editor uses it for pasted Markdown.
 * `Kotoba.Content.empty/0` is an empty document.
 
 ```elixir

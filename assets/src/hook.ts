@@ -86,6 +86,7 @@ import {
 } from "lexical";
 
 import { BUILT_IN_NODES, CORE_TYPES, createKotobaEditor, registeredTypes } from "./editor";
+import { registerMarkdownPaste } from "./markdown_paste";
 import {
   composeExtensions,
   extensionControls,
@@ -153,6 +154,10 @@ export interface Config {
   /** The Assist menu's actions, or `null` for an editor with no assist. */
   assist: AssistAction[] | null;
   collab: CollabCredentials | null;
+  /** The id of the element of the server's half of pasted Markdown, or `null`. */
+  markdown: string | null;
+  /** `"collapse"` leaves the blank lines a person typed out of the saved document. */
+  blankLines: "keep" | "collapse";
 }
 
 /** Reads the hook's configuration from the data attributes of its element. */
@@ -178,6 +183,8 @@ export function readConfig(el: HTMLElement): Config {
     selectionMenu: parseSelectionMenu(data.selectionMenu),
     assist: parseAssist(data.assist),
     collab: readCollabCredentials(data.collab),
+    markdown: data.markdown ?? null,
+    blankLines: data.blankLines === "collapse" ? "collapse" : "keep",
   };
 }
 
@@ -401,6 +408,17 @@ class Instance {
       }),
     );
 
+    const markdown = this.config.markdown;
+    if (markdown !== null && !this.config.readonly) {
+      this.cleanups.push(
+        registerMarkdownPaste(editor, {
+          request: (text, reply) =>
+            this.hook.pushEventTo(`#${CSS.escape(markdown)}`, "kotoba:markdown", { v: PROTOCOL_VERSION, markdown: text }, reply),
+          announce: this.announce,
+        }),
+      );
+    }
+
     // Suggestions show in a panel under the editable area, rendered with the
     // editor's nodes, and read with its Markdown shortcuts.
     const assist = this.config.assist;
@@ -518,7 +536,7 @@ class Instance {
         const remote = tags.has(REMOTE_TAG) || tags.has("kotoba-collab");
         if (!remote && dirtyElements.size === 0 && dirtyLeaves.size === 0) return;
 
-        this.json = JSON.stringify(toEnvelope(editorState));
+        this.json = JSON.stringify(toEnvelope(editorState, { collapseBlankLines: this.config.blankLines === "collapse" }));
         if (this.config.input !== null) this.config.input.value = this.json;
 
         if (remote) {

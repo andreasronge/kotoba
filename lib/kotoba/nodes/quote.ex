@@ -1,10 +1,17 @@
 defmodule Kotoba.Nodes.Quote do
   @moduledoc """
   A block quote (Lexical type `"quote"`).
+
+  A quote holds inline content. With `shadow_root` (`"shadowRoot": true`,
+  Lexical's own opt-in), it holds blocks instead: paragraphs, headings,
+  lists, code blocks, tables, horizontal rules and other quotes, as a
+  Markdown quote can.
   """
   use Kotoba.Node, type: "quote", kind: :block, element: true
 
   alias Kotoba.Renderer
+
+  field :shadow_root, :boolean, key: "shadowRoot", omit_nil: true
 
   @impl Kotoba.Node
   def render_html(node, opts),

@@ -239,6 +239,38 @@
 .kotoba-h2 { font-size: var(--kotoba-h2-size); }
 .kotoba-h3 { font-size: var(--kotoba-h3-size); }
 .kotoba-h4 { font-size: var(--kotoba-h4-size); }
+.kotoba-h5 { font-size: 1em; }
+.kotoba-h6 { font-size: .9em; color: var(--kotoba-muted); }
+
+/* A quote of blocks (shadowRoot): its last block has no margin. */
+.kotoba-quote > :last-child { margin-bottom: 0; }
+
+/* Footnotes: the editor's (a block with its label) and the rendered list. */
+.kotoba-footnote {
+  position: relative;
+  margin: 0 0 var(--kotoba-space);
+  padding-inline-start: 2em;
+  font-size: .9em;
+  color: var(--kotoba-muted);
+}
+
+.kotoba-footnote::before {
+  content: "[" attr(data-label) "]";
+  position: absolute;
+  inset-inline-start: 0;
+  font-size: .8em;
+  line-height: 2;
+}
+
+.kotoba-footnote > :last-child { margin-bottom: 0; }
+
+.kotoba-footnote-ref sup,
+sup.kotoba-footnote-ref {
+  font-size: .75em;
+  line-height: 0;
+}
+
+span.kotoba-footnote-ref { color: var(--kotoba-accent); cursor: default; }
 
 .kotoba-quote {
   padding-left: var(--kotoba-space);
@@ -465,6 +497,15 @@ mark.kotoba-highlight-gray { background: var(--kotoba-highlight-gray); color: in
   margin: 0 0 var(--kotoba-space);
   cursor: default;
 }
+
+/* An image from a URL (Markdown's `![alt](url)`), in the text. */
+.kotoba-image { display: inline-block; max-width: 100%; vertical-align: bottom; }
+.kotoba-image img, img.kotoba-image { max-width: 100%; height: auto; }
+
+/* The alignment of a table column (`:-:` in Markdown). */
+.kotoba-table .kotoba-align-left { text-align: left; }
+.kotoba-table .kotoba-align-center { text-align: center; }
+.kotoba-table .kotoba-align-right { text-align: right; }
 
 .kotoba-attachment-figure {
   display: inline-flex;
@@ -1071,11 +1112,15 @@ div.kotoba-unknown {
 .kotoba-content { line-height: 1.65; overflow-wrap: anywhere; }
 .kotoba-content > :where(:first-child) { margin-top: 0; }
 .kotoba-content :where(p) { margin: 0 0 1em; }
-.kotoba-content :where(:is(h1, h2, h3, h4)) { line-height: 1.25; font-weight: 650; margin: 1.5em 0 .55em; }
+.kotoba-content :where(:is(h1, h2, h3, h4, h5, h6)) { line-height: 1.25; font-weight: 650; margin: 1.5em 0 .55em; }
 .kotoba-content :where(h1) { font-size: 2em; }
 .kotoba-content :where(h2) { font-size: 1.6em; }
 .kotoba-content :where(h3) { font-size: 1.3em; }
 .kotoba-content :where(h4) { font-size: 1.1em; }
+.kotoba-content :where(h5) { font-size: 1em; }
+.kotoba-content :where(h6) { font-size: .9em; color: var(--kotoba-muted); }
+.kotoba-content :where(section.kotoba-footnotes) { margin-top: 2em; padding-top: 1em; border-top: 1px solid var(--kotoba-border); font-size: .9em; color: var(--kotoba-muted); }
+.kotoba-content :where(section.kotoba-footnotes ol) { list-style: decimal; padding-inline-start: 1.7em; }
 .kotoba-content :where(ul:not(.kotoba-check), ol) { padding-inline-start: 1.7em; margin: .5em 0 1.25em; }
 .kotoba-content :where(ul:not(.kotoba-check)) { list-style: disc; }
 .kotoba-content :where(ul.kotoba-check) { margin: .5em 0 1.25em; }

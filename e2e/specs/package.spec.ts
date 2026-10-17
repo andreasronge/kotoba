@@ -20,7 +20,7 @@ test("the package can be required and imported from Node", () => {
       import("kotoba").then((esm) => console.log(cjs + "|" + Object.keys(esm).sort().join(",")));
     `;
     const output = execFileSync(process.execPath, ["-e", script], { cwd: project });
-    expect(output.toString().trim()).toBe("AttachmentNode,GalleryNode,Kotoba,MentionNode,highlightRenderedContent,registerCollaboration|AttachmentNode,GalleryNode,Kotoba,MentionNode,highlightRenderedContent,registerCollaboration");
+    expect(output.toString().trim()).toBe("AttachmentNode,FootnoteDefinitionNode,FootnoteReferenceNode,GalleryNode,ImageNode,Kotoba,MentionNode,highlightRenderedContent,registerCollaboration|AttachmentNode,FootnoteDefinitionNode,FootnoteReferenceNode,GalleryNode,ImageNode,Kotoba,MentionNode,highlightRenderedContent,registerCollaboration");
   } finally {
     rmSync(project, { recursive: true, force: true });
   }

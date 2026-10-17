@@ -18,17 +18,19 @@ defmodule Kotoba.Sanitizer do
       only inside a list. A list item holds inline nodes, decorators and
       one nested list (by position: a second list at the same level
       renders as unknown, even when it repeats the first). A table is
-      valid only under the root and holds only table rows; a table row is
-      valid only in a table and holds only table cells; a table cell is
-      valid only in a table row, and holds no table. A gallery is valid only
-      under the root and holds only attachments. A code block
-      holds only code highlight, text, line break and tab nodes. A
+      valid only under the root, a quote of blocks or a footnote, and
+      holds only table rows; a table row is valid only in a table and
+      holds only table cells; a table cell is valid only in a table row,
+      and holds no table. A gallery is valid only under the root and holds
+      only attachments. A footnote is valid only under the root. A code
+      block holds only code highlight, text, line break and tab nodes. A
       paragraph, a heading, a quote and a link hold only inline nodes and
-      decorators, and a link holds no other link. A decorator has no
-      children. `horizontalrule` and `attachment` (block decorators) are
-      valid only under the root, a list item or a table cell (and an
-      attachment in a gallery); elsewhere
-      they render as unknown.
+      decorators, and a link holds no other link; a quote of blocks
+      (`shadowRoot`) holds blocks too. A decorator has no children.
+      `horizontalrule` and `attachment` (block decorators) are valid only
+      under the root, a list item, a table cell, a quote of blocks or a
+      footnote (and an attachment in a gallery); elsewhere they render as
+      unknown.
     * **Links.** `link_url/2` accepts a URL with an allowed scheme, or a
       relative URL. A link with a URL that is not safe renders as its text.
       An attachment with a URL or a `preview` that is not safe fails the
@@ -290,8 +292,20 @@ defmodule Kotoba.Sanitizer do
 
   defp check_parent(%Nodes.Table{}, %Nodes.Root{}, _opts), do: :ok
 
+  defp check_parent(%Nodes.Table{}, parent, _opts)
+       when is_struct(parent, Nodes.FootnoteDefinition),
+       do: :ok
+
+  defp check_parent(%Nodes.Table{}, %Nodes.Quote{shadow_root: true}, _opts), do: :ok
+
   defp check_parent(%Nodes.Table{}, _other_parent, _opts),
-    do: {:error, "a table is valid only under the root"}
+    do: {:error, "a table is valid only under the root, a quote of blocks or a footnote"}
+
+  # A footnote is valid only under the root.
+  defp check_parent(%Nodes.FootnoteDefinition{}, %Nodes.Root{}, _opts), do: :ok
+
+  defp check_parent(%Nodes.FootnoteDefinition{}, _other_parent, _opts),
+    do: {:error, "a footnote is valid only under the root"}
 
   # A gallery under the root holds attachments.
   defp check_parent(%Nodes.Attachment{}, %Nodes.Gallery{}, _opts), do: :ok
@@ -340,15 +354,24 @@ defmodule Kotoba.Sanitizer do
       %Nodes.TableCell{} ->
         :ok
 
+      %Nodes.Quote{shadow_root: true} ->
+        :ok
+
+      %Nodes.FootnoteDefinition{} ->
+        :ok
+
       _other ->
         {:error,
-         "a #{module.type()} node is valid only under the root, a list item or a table cell"}
+         "a #{module.type()} node is valid only under the root, a list item, a table cell, a quote of blocks or a footnote"}
     end
   end
 
   defp check_parent(%link{}, %parent{}, _opts)
        when link in [Nodes.Link, Nodes.AutoLink] and parent in [Nodes.Link, Nodes.AutoLink],
        do: {:error, "a link holds no other link"}
+
+  # A quote of blocks holds blocks and inline nodes, as a table cell does.
+  defp check_parent(_node, %Nodes.Quote{shadow_root: true}, _opts), do: :ok
 
   defp check_parent(%module{}, %parent{}, _opts)
        when parent in [

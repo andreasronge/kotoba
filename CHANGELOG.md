@@ -7,6 +7,66 @@ and Kotoba follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-17
+
+Full Markdown. This release has breaking changes, listed under Changed.
+
+### Added
+
+- `Kotoba.Content.from_markdown/2` reads CommonMark and GitHub Flavored
+  Markdown with MDEx (comrak, a port of GitHub's cmark-gfm): setext
+  headings, `__` emphasis, nested emphasis, entities and escapes,
+  reference links, link titles, autolinks, images, `+` bullets and `1)`
+  lists, nested lists and check lists, lazy lines, `~~~` and indented code,
+  tables with column alignment, and footnotes. Every example of the GFM
+  spec (CommonMark included) reads into Kotoba and writes back to Markdown
+  that renders the same, but for raw HTML, which is text, and list items
+  that hold blocks (see below); a test runs them all.
+- `from_markdown/2` takes `features:`: a construct whose feature is off
+  becomes its closest form, with no text lost.
+- **Pasted Markdown** becomes rich text: plain text that reads as Markdown
+  (and no rich HTML) goes to the server, which reads it as
+  `from_markdown/2` does, with the editor's features. `<.kotoba>` renders
+  the server's half itself (`Kotoba.MarkdownPaste`, a LiveComponent): an
+  app adds no code. `paste_markdown={false}` turns it off.
+- **Quotes that hold blocks**: paragraphs, lists, code, tables and other
+  quotes, with Lexical's own `shadowRoot` opt-in on the quote node.
+- **Images from a URL** (`image` node, the `images` feature): Markdown's
+  `![alt](url "title")`, in the text. The URL is checked as a link's is,
+  and the `:untrusted` policy renders the alternative text.
+- **Footnotes** (`footnotereference` and `footnotedefinition` nodes, the
+  `footnotes` feature), numbered in the order of their first reference,
+  in a list at the end of the rendered HTML.
+- **Blank lines**: the empty paragraphs that a person types between
+  blocks keep their height in HTML (`<p><br></p>`) and are `&nbsp;` in
+  Markdown, which reads back. The `blank_lines: :collapse` render option
+  and `<.kotoba blank_lines={:collapse}>` leave them out.
+- Table columns keep their alignment (`kotoba-align-*` classes, `:-:` in
+  Markdown).
+
+### Changed
+
+- **Breaking:** MDEx is a dependency: a native library, precompiled for
+  Linux (glibc 2.35 or later, and musl), macOS, Windows and FreeBSD; on
+  another system it builds with Rust.
+- **Breaking:** the lines of a Markdown paragraph are one line, as
+  CommonMark has them (a line ending with two spaces or `\` is a line
+  break). The old reader made each line a line break.
+- **Breaking:** a quote read from Markdown is a quote of blocks:
+  `<blockquote><p>...</p></blockquote>`.
+- **Breaking:** `image`, `footnotereference` and `footnotedefinition` are
+  built-in node types: an app node cannot have them.
+- **Breaking:** `h5` and `h6` render as themselves (they were `h4`).
+- The Markdown of `Kotoba.Renderer.to_markdown/2` nests formats (a format
+  opens once over the text that has it), keeps a URL with spaces or
+  parentheses in angle brackets, and gives two lists in a row different
+  markers, so that it reads back as the same document.
+- `Kotoba.Features` has `images` and `footnotes`. An editor with a
+  `features` list has them only when the list names them.
+- A list item with several paragraphs, or with a code block, a quote or a
+  table, reads as an item with line breaks and the blocks after the list:
+  a Lexical list item holds inline content only.
+
 ## [0.2.2] - 2026-10-17
 
 ### Changed
@@ -294,7 +354,8 @@ The first release.
 - Guides: quickstart, forms, uploads, prompts, custom nodes, theming,
   security, accessibility and known limits.
 
-[Unreleased]: https://github.com/hattoriai/kotoba/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/hattoriai/kotoba/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/hattoriai/kotoba/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/hattoriai/kotoba/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/hattoriai/kotoba/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/hattoriai/kotoba/compare/v0.1.0...v0.2.0

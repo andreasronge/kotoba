@@ -31,6 +31,16 @@ not (`Kotoba.Features`):
 | `tables` | tables | Table, and the Table group | Tab, Shift+Tab | |
 | `attachments` | files, images and galleries (with `uploads`) | Attach a file, and the Image group | drop, paste; `Alt+Left`, `Alt+Right` in a gallery | |
 | `mentions` | prompts and mentions (with `prompts`) | | the trigger | |
+| `images` | images from a URL, in the text | | | `![alt](url)` (pasted) |
+| `footnotes` | footnotes and their references | | | `[^1]` and `[^1]: text` (pasted) |
+
+Pasted Markdown is not a feature: plain text that reads as Markdown (a
+README, a note from a Markdown app) comes in as rich text, read on the
+server as `Kotoba.Content.from_markdown/2` reads it, with the features of
+the editor. `<.kotoba>` renders the server's half, so the app adds no
+code; `paste_markdown={false}` turns it off. Images and footnotes come
+from pasted Markdown and from the server; the editor has no button for
+them yet.
 
 Suggestions are not a feature: an editor with `assist` has an Assist
 button, and any editor shows the text that the server streams with

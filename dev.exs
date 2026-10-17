@@ -404,6 +404,7 @@ defmodule KotobaDev.EditorLive do
        changes: 0,
        push_changes: params["change"] != nil,
        menu: params["menu"],
+       blank_lines: if(params["blank_lines"] == "collapse", do: :collapse, else: :keep),
        validated: 0,
        validated_text: "",
        reverse: params["uploads"] == "reverse",
@@ -440,6 +441,7 @@ defmodule KotobaDev.EditorLive do
         nodes={[{KotobaDev.Nodes.Tag, "/assets/nodes/tag.js"}]}
         assist={KotobaDev.Assist.actions()}
         selection_menu={@menu == "default"}
+        blank_lines={@blank_lines}
       >
         <:selection :if={@menu == "custom"}>
           <.kotoba_selection_menu id="custom-menu" class="custom-menu" label="Quick format">

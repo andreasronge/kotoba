@@ -60,7 +60,9 @@ defmodule Kotoba.FeaturesTest do
         code([highlight("x")], "elixir"),
         hr(),
         table([table_row([table_cell([paragraph([mention("people", "1", "Ada")])])])]),
-        attachment()
+        attachment(),
+        paragraph([image("https://a.b/c.png", "c"), footnote_reference("1")]),
+        footnote_definition("1", [paragraph([text("Note")])])
       ]
 
       assert Features.used(doc(input)) == Features.all()

@@ -66,12 +66,12 @@ defmodule Kotoba.RendererTest do
       assert html([paragraph([])]) == "<p></p>"
     end
 
-    test "heading, with h5 and h6 as h4" do
+    test "heading, h1 to h6" do
       assert html([heading("h1", [text("A")])]) == "<h1>A</h1>"
       assert html([heading("h3", [text("A")])]) == "<h3>A</h3>"
       assert html([heading("h4", [text("A")])]) == "<h4>A</h4>"
-      assert html([heading("h5", [text("A")])]) == "<h4>A</h4>"
-      assert html([heading("h6", [text("A")])]) == "<h4>A</h4>"
+      assert html([heading("h5", [text("A")])]) == "<h5>A</h5>"
+      assert html([heading("h6", [text("A")])]) == "<h6>A</h6>"
     end
 
     test "quote" do
@@ -778,7 +778,7 @@ defmodule Kotoba.RendererTest do
       ]
 
       assert input |> doc() |> Renderer.to_markdown() ==
-               "## Title\n\n**bold** *it* ~~gone~~ ``a`b`` [link](https://a.b/x%20y) and \\*stars\\* under"
+               "## Title\n\n**bold** *it* ~~gone~~ ``a`b`` [link](<https://a.b/x y>) and \\*stars\\* under"
     end
 
     test "lists" do

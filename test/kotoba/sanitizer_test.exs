@@ -198,7 +198,8 @@ defmodule Kotoba.SanitizerTest do
       assert :ok = Sanitizer.check(table, %Nodes.Root{})
 
       for parent <- [%Nodes.TableCell{}, %Nodes.ListItem{}, %Nodes.Quote{}, %Nodes.Paragraph{}] do
-        assert {:error, "a table is valid only under the root"} = Sanitizer.check(table, parent)
+        assert {:error, "a table is valid only under the root" <> _rest} =
+                 Sanitizer.check(table, parent)
       end
 
       assert :ok = Sanitizer.check(row, table)

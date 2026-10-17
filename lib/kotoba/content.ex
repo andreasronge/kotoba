@@ -269,21 +269,31 @@ defmodule Kotoba.Content do
   end
 
   @doc """
-  Builds a `Kotoba.Content` from a Markdown string, on a best-effort
-  basis.
+  Builds a `Kotoba.Content` from a Markdown string.
 
-  Reads what `Kotoba.Renderer.to_markdown/2` writes, and the common GitHub
-  Flavored Markdown around it: paragraphs, `#` headings, `>` quotes,
-  horizontal rules, fenced code blocks, `-`/`*`/`1.` lists (one level; a
-  numbered list keeps its first number), `- [ ]` check lists, pipe tables
-  with a header row, and the inline `**bold**`, `*italic*`/`_italic_`,
-  `~~strikethrough~~`, `` `code` `` and `[text](url)` syntax, which nest.
-  Anything else becomes plain paragraph text. When the built document
+  MDEx (comrak, a port of GitHub's cmark-gfm) reads the Markdown:
+  CommonMark and GitHub Flavored Markdown, with tables, task lists,
+  strikethrough, autolinks and footnotes. Each construct becomes its
+  node: quotes hold blocks, an image is a `Kotoba.Nodes.Image`, and a
+  paragraph of `&nbsp;` is a blank line (see `Kotoba.Nodes.Paragraph`), so
+  the Markdown of `Kotoba.Renderer.to_markdown/2` reads back to the same
+  document.
+
+  Raw HTML is text: Kotoba never passes HTML through. A list item holds
+  inline content and one nested list; the paragraphs of an item with
+  several are joined by line breaks, and a code block, a quote, a table or
+  a heading in an item comes after the list. When the built document
   somehow fails to parse, returns `empty/0`.
 
   ## Options
 
-  Same as `rerender/2`.
+    * `:features` - the features of the editor (see `Kotoba.Features`),
+      every feature by default. A construct whose feature is off becomes
+      its closest form, with no text lost: a heading a paragraph, a quote
+      its blocks, a list its items, a table a line for each row, an image
+      its alternative text, a footnote its `[^label]` text, and a format is
+      dropped.
+    * `:nodes` and `:policy` - as in `rerender/2`.
 
   ## Examples
 
@@ -294,7 +304,8 @@ defmodule Kotoba.Content do
   """
   @spec from_markdown(String.t(), keyword()) :: t()
   def from_markdown(markdown, opts \\ []) when is_binary(markdown) do
-    envelope = wrap(MarkdownImport.root(markdown))
+    {features, opts} = Keyword.pop(opts, :features, Kotoba.Features.all())
+    envelope = wrap(MarkdownImport.root(markdown, features: features))
     {nodes, render_opts} = Keyword.pop(opts, :nodes, [])
 
     case Document.parse(envelope, nodes: nodes) do

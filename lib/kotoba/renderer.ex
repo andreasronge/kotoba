@@ -36,6 +36,9 @@ defmodule Kotoba.Renderer do
     * `:policy` - `:default` or `:untrusted`. See `Kotoba.Sanitizer`. The
       default is `:default`.
     * `:schemes` - the allowed link schemes. See `Kotoba.Sanitizer.link_url/2`.
+    * `:blank_lines` - `:keep` (the default) or `:collapse`: whether the
+      blank lines that a person typed (empty paragraphs between blocks) are
+      in the output. See `Kotoba.Nodes.Paragraph`.
 
   ## The options of the render callbacks
 
@@ -52,7 +55,7 @@ defmodule Kotoba.Renderer do
   """
 
   alias Kotoba.{Document, Sanitizer}
-  alias Kotoba.Nodes.{Root, Unknown}
+  alias Kotoba.Nodes.{AutoLink, FootnoteReference, Link, Root, Text, Unknown}
 
   @typedoc "An attribute of an HTML tag. A `nil` or `false` value is left out."
   @type attribute :: {atom() | String.t(), String.t() | integer() | boolean() | nil}
@@ -79,8 +82,24 @@ defmodule Kotoba.Renderer do
   """
   @spec to_html(Document.t(), keyword()) :: Phoenix.HTML.safe()
   def to_html(%Document{root: root}, opts \\ []) do
-    {:safe, render(root, nil, :html, prepare(opts))}
+    opts = opts |> prepare() |> Keyword.put_new_lazy(:footnotes, fn -> footnote_numbers(root) end)
+    {:safe, render(root, nil, :html, opts)}
   end
+
+  # The number of each footnote: the order of its first reference.
+  defp footnote_numbers(root) do
+    root
+    |> footnote_labels([])
+    |> Enum.reverse()
+    |> Enum.uniq()
+    |> Enum.with_index(1)
+    |> Map.new()
+  end
+
+  defp footnote_labels(%FootnoteReference{label: label}, acc), do: [label | acc]
+
+  defp footnote_labels(node, acc),
+    do: node |> children() |> Enum.reduce(acc, &footnote_labels/2)
 
   @doc """
   Renders a document as plain text. Blocks are separated by `"\\n"`.
@@ -128,7 +147,9 @@ defmodule Kotoba.Renderer do
 
     node
     |> segments(:text, opts)
-    |> Enum.reject(fn {block, text} -> block == :decorator and text == "" end)
+    |> Enum.reject(fn {block, text} ->
+      text == "" and (block == :decorator or opts[:blank_lines] == :collapse)
+    end)
     |> Enum.map_join("\n", &elem(&1, 1))
   end
 
@@ -246,15 +267,15 @@ defmodule Kotoba.Renderer do
 
   @doc """
   Returns a URL for the destination of a Markdown link, for a
-  `c:Kotoba.Node.render_markdown/2` callback. Spaces and parentheses are
-  percent-encoded, and `\\`, `&`, `<` and `>` get a backslash, so that a
-  CommonMark renderer decodes no entity. Check the URL with
-  `Kotoba.Sanitizer.link_url/2` first.
+  `c:Kotoba.Node.render_markdown/2` callback. `\\`, `&`, `<` and `>` get a
+  backslash, so that a CommonMark renderer decodes no entity, and a URL
+  with spaces or parentheses is in angle brackets, as it is. Check the URL
+  with `Kotoba.Sanitizer.link_url/2` first.
 
   ## Examples
 
       iex> Kotoba.Renderer.escape_markdown_url("/docs/a page (draft)")
-      "/docs/a%20page%20%28draft%29"
+      "</docs/a page (draft)>"
 
       iex> Kotoba.Renderer.escape_markdown_url("/search?q=a&b")
       "/search?q=a\\\\&b"
@@ -312,10 +333,60 @@ defmodule Kotoba.Renderer do
 
   defp segment_chunk([{first, _index} | _rest] = chunk, node, format, opts) do
     case level(first, node) do
+      :inline when format == :markdown -> [{:inline, markdown_run(chunk, node, opts)}]
       :inline -> [{:inline, Enum.map_join(chunk, &render_indexed(&1, node, format, opts))}]
       level -> Enum.map(chunk, &{level, render_indexed(&1, node, format, opts)})
     end
   end
+
+  # A run of inline nodes as Markdown. A format that several nodes share
+  # opens once before the first and closes after the last, so that nested
+  # formats nest (`**foo *bar* baz**`). The formats that the text of a link
+  # shares go around the link. `:markdown_formats` is the formats already
+  # open around the run (the run of a link's text).
+  defp markdown_run(chunk, node, opts) do
+    open = Keyword.get(opts, :markdown_formats, [])
+
+    chunk
+    |> Enum.map(fn {child, index} -> run_item(child, node, indexed(opts, index), open) end)
+    |> Kotoba.Markdown.formatted(open)
+  end
+
+  defp run_item(%Text{} = text, node, opts, _open) do
+    case Sanitizer.check(text, node, opts) do
+      :ok -> {Text.markdown_formats(text), Text.markdown_body(text)}
+      {:error, _reason} -> {:neutral, ""}
+    end
+  end
+
+  defp run_item(%link{} = child, node, opts, open)
+       when link in [Link, AutoLink] do
+    shared = shared_formats(child)
+
+    {shared,
+     render(
+       child,
+       node,
+       :markdown,
+       Keyword.put(opts, :markdown_formats, Enum.uniq(open ++ shared))
+     )}
+  end
+
+  defp run_item(child, node, opts, _open), do: {:neutral, render(child, node, :markdown, opts)}
+
+  # The Markdown formats that every text of a node has.
+  defp shared_formats(node) do
+    node
+    |> texts([])
+    |> Enum.map(&Text.markdown_formats/1)
+    |> case do
+      [] -> []
+      [first | rest] -> Enum.filter(first, fn format -> Enum.all?(rest, &(format in &1)) end)
+    end
+  end
+
+  defp texts(%Text{text: text} = node, acc) when text != "", do: [node | acc]
+  defp texts(node, acc), do: node |> children() |> Enum.reduce(acc, &texts/2)
 
   defp render_indexed({child, index}, node, format, opts),
     do: render(child, node, format, indexed(opts, index))

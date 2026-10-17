@@ -282,7 +282,7 @@ defmodule Kotoba.ComponentsTest do
 
       html =
         rendered_to_string(~H"""
-        <Components.kotoba field={@field}>
+        <Components.kotoba field={@field} paste_markdown={false}>
           <:toolbar><Components.kotoba_toolbar commands={["bold", "link"]} /></:toolbar>
         </Components.kotoba>
         """)
@@ -323,7 +323,7 @@ defmodule Kotoba.ComponentsTest do
 
       html =
         rendered_to_string(~H"""
-        <Components.kotoba field={@field}>
+        <Components.kotoba field={@field} paste_markdown={false}>
           <:selection>
             <Components.kotoba_selection_menu class="mine">
               <:button command="bold">B</:button>

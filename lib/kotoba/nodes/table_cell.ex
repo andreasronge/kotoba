@@ -55,6 +55,7 @@ defmodule Kotoba.Nodes.TableCell do
 
     attrs = [
       scope: scope,
+      class: if(align = align(node), do: "kotoba-align-" <> align),
       colspan: if(node.col_span > 1, do: node.col_span),
       rowspan: if(node.row_span > 1, do: node.row_span)
     ]
@@ -73,6 +74,23 @@ defmodule Kotoba.Nodes.TableCell do
     |> String.replace("|", "\\|")
     |> String.replace(~r/ *\n/, "<br>")
   end
+
+  @doc """
+  Returns the alignment of the cell, `"left"`, `"center"` or `"right"`, or
+  `nil`: the alignment (`format`) of its first paragraph, as the editor
+  sets it. `"start"` and `"end"` are `"left"` and `"right"`.
+  """
+  @spec align(t()) :: String.t() | nil
+  def align(%{children: [%{format: format} | _rest]}) when is_binary(format) do
+    case format do
+      format when format in ["left", "start"] -> "left"
+      "center" -> "center"
+      format when format in ["right", "end"] -> "right"
+      _other -> nil
+    end
+  end
+
+  def align(_node), do: nil
 
   @doc "Returns `true` for a cell of the header row (`headerState` 1 or 3)."
   @spec column_header?(t()) :: boolean()

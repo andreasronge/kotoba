@@ -172,6 +172,17 @@ defmodule Kotoba.Components do
     doc:
       "when `true`, the editor shows the document and cannot change it; a change in a later render reaches the editor"
 
+  attr :blank_lines, :atom,
+    default: :keep,
+    values: [:keep, :collapse],
+    doc:
+      "`:keep` saves the blank lines a person types (empty paragraphs between blocks), as a word processor does; `:collapse` leaves them out of the saved document"
+
+  attr :paste_markdown, :boolean,
+    default: true,
+    doc:
+      "when `true`, pasted plain text that reads as Markdown becomes rich text, read on the server by `Kotoba.MarkdownPaste`, which the editor renders with no code of the app; `false` renders no LiveComponent, for a template that cannot have one"
+
   attr :change, :boolean,
     default: false,
     doc:
@@ -216,6 +227,8 @@ defmodule Kotoba.Components do
         selection_menu: selection_menu(assigns.selection_menu),
         code_languages: code_languages(assigns.code_languages),
         features: assigns.features && Enum.join(Features.names!(assigns.features), ","),
+        feature_list:
+          if(assigns.features, do: Features.names!(assigns.features), else: Features.all()),
         extension_urls: extension_urls(assigns.extensions),
         link_schemes: Enum.join(Sanitizer.allowed_schemes(), ","),
         aria_label: aria_label(assigns, field),
@@ -249,6 +262,8 @@ defmodule Kotoba.Components do
         data-upload={@upload_id}
         data-debounce={@debounce}
         data-link-schemes={@link_schemes}
+        data-markdown={@paste_markdown && @id <> "-markdown"}
+        data-blank-lines={if @blank_lines == :collapse, do: "collapse"}
         data-aria-describedby={@described_by}
         data-aria-invalid={@invalid}
         aria-labelledby={@label_id}
@@ -258,6 +273,13 @@ defmodule Kotoba.Components do
         {render_slot(@toolbar)}
         {render_slot(@selection)}
       </div>
+      <.live_component
+        :if={@paste_markdown}
+        module={Kotoba.MarkdownPaste}
+        id={@id <> "-markdown"}
+        features={@feature_list}
+        nodes={node_modules(@nodes)}
+      />
       <div :if={@uploads} class="kotoba-visually-hidden">
         <label for={@upload_id}>{@upload_label}</label>
         <.live_file_input upload={@uploads} tabindex="-1" />
@@ -304,6 +326,9 @@ defmodule Kotoba.Components do
         raise ArgumentError, "a Kotoba node must be {module, js_url}, got: #{inspect(other)}"
     end)
   end
+
+  # The app node modules of `nodes`, for the registry of pasted Markdown.
+  defp node_modules(nodes), do: for({module, _url} <- nodes, is_atom(module), do: module)
 
   defp extension_urls([]), do: nil
 

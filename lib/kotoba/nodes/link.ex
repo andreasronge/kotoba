@@ -57,7 +57,7 @@ defmodule Kotoba.Nodes.Link do
 
     with href when is_binary(href) <- href(node, opts),
          destination when is_binary(destination) <- Markdown.destination(href) do
-      "[" <> text <> "](" <> destination <> ")"
+      "[" <> text <> "](" <> destination <> Markdown.title(Map.get(node, :title)) <> ")"
     else
       nil -> text
     end

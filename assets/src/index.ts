@@ -9,5 +9,7 @@ export type { Collaboration, CollabCredentials } from "./collaboration";
 export { AttachmentNode } from "./nodes/attachment";
 export { GalleryNode } from "./nodes/gallery";
 export { MentionNode } from "./nodes/mention";
+export { ImageNode } from "./nodes/image";
+export { FootnoteDefinitionNode, FootnoteReferenceNode } from "./nodes/footnote";
 // The types of an extension module (see the Extensions guide).
 export type { ExtensionAPI, ExtensionContext, KotobaExtension, ToolbarControl } from "./extensions";

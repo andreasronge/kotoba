@@ -29,6 +29,7 @@ import { HeadingNode, QuoteNode, registerRichText } from "@lexical/rich-text";
 import { TableCellNode, TableNode, TableRowNode } from "@lexical/table";
 import { $insertNodeToNearestRoot, $unwrapNode } from "@lexical/utils";
 import {
+  $createTextNode,
   $getSelection,
   $isRangeSelection,
   COMMAND_PRIORITY_CRITICAL,
@@ -55,6 +56,8 @@ import { AttachmentNode } from "./nodes/attachment";
 import { GalleryNode } from "./nodes/gallery";
 import { registerDecorators } from "./nodes/decorator";
 import { UnknownNode, UploadMarkerNode } from "./nodes/internal";
+import { FootnoteDefinitionNode, FootnoteReferenceNode } from "./nodes/footnote";
+import { $isImageNode, ImageNode } from "./nodes/image";
 import { MentionNode } from "./nodes/mention";
 
 /** The built-in features, in the order of `Kotoba.Features`. */
@@ -77,6 +80,8 @@ export const FEATURES = [
   "tables",
   "attachments",
   "mentions",
+  "images",
+  "footnotes",
 ] as const;
 
 export type Feature = (typeof FEATURES)[number];
@@ -107,6 +112,8 @@ export const FEATURE_NODES: Partial<Record<Feature, readonly Klass<LexicalNode>[
   tables: [TableNode, TableRowNode, TableCellNode],
   attachments: [AttachmentNode, GalleryNode, UploadMarkerNode],
   mentions: [MentionNode],
+  images: [ImageNode],
+  footnotes: [FootnoteReferenceNode, FootnoteDefinitionNode],
 };
 
 function isFeature(value: string): value is Feature {
@@ -283,6 +290,19 @@ export function builtInExtensions(features: ReadonlySet<Feature>, options: Featu
       register: (editor, context) => registerGallery(editor, { announce: (message) => context.announce(message) }),
     },
     mentions: { name: "mentions", nodes: FEATURE_NODES.mentions },
+    images: {
+      name: "images",
+      nodes: FEATURE_NODES.images,
+      // An image from pasted content or the server whose URL the server
+      // would not keep becomes its alternative text.
+      register: (editor) =>
+        editor.registerNodeTransform(ImageNode, (node) => {
+          if ($isImageNode(node) && !isAllowedLinkUrl(node.getImage().url, options.linkSchemes)) {
+            node.replace($createTextNode(node.getImage().alt));
+          }
+        }),
+    },
+    footnotes: { name: "footnotes", nodes: FEATURE_NODES.footnotes },
   };
 
   return [core, ...FEATURES.filter((feature) => features.has(feature)).map((feature) => extensions[feature])];

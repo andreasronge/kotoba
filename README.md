@@ -45,9 +45,10 @@ README has the details) to try every feature in your browser.
 | Suggestions | text streamed from the server (a language model), shown as it comes, then accepted as one undo step or rejected; an Assist menu |
 | Collaboration | shared documents, participant cursors, read-only viewers, per-author undo, offline draft recovery and accepted revisions for form submission; [setup](guides/collaboration.md) |
 | Shortcuts | the usual keyboard shortcuts, and Markdown as you type (`## `, `- `, `**bold**`, ` ``` `) |
+| Markdown | CommonMark and GitHub Flavored Markdown in and out: paste a README and it looks as it does on GitHub; quotes of blocks, images, footnotes, aligned table columns; the whole GFM spec in the tests |
 | Per field | the features of each editor (`features={~w(bold links lists)}`), checked on the server |
 | Your own | nodes (`mix kotoba.gen.node`), extensions with commands, toolbar buttons and shortcuts, custom toolbars |
-| Output | cached, safe HTML and plain text; Markdown; a strict policy for untrusted content |
+| Output | cached, safe HTML and plain text; Markdown that reads back to the same document; blank lines kept, or collapsed; a strict policy for untrusted content |
 | Theming | CSS custom properties, the Sumi theme, dark mode |
 | Accessibility | a labelled textbox, a toolbar with one tab stop, a live region, no keyboard trap |
 
@@ -67,7 +68,7 @@ Add `kotoba` to the deps in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:kotoba, "~> 0.2"}
+    {:kotoba, "~> 0.3"}
   ]
 end
 ```

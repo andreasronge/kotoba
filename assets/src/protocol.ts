@@ -91,13 +91,40 @@ function prepareChildren(
 }
 
 /** Writes the editor state as a document envelope. */
-export function toEnvelope(editorState: EditorState): DocumentEnvelope {
+export function toEnvelope(editorState: EditorState, options: { collapseBlankLines?: boolean } = {}): DocumentEnvelope {
   const state: SerializedEditorState = editorState.toJSON();
+  const root = exportNode(state.root) ?? { type: "root", children: [] };
   return {
     kotoba: DOCUMENT_VERSION,
     lexical: LEXICAL_VERSION,
-    root: exportNode(state.root) ?? { type: "root", children: [] },
+    root: options.collapseBlankLines === true ? collapseBlankLines(root) : root,
   };
+}
+
+// The blocks that hold paragraphs as the root does.
+const BLOCK_PARENTS = new Set(["root", "quote", "footnotedefinition"]);
+
+function isEmptyParagraph(node: JSONNode): boolean {
+  if (node.type !== "paragraph") return false;
+  const children = Array.isArray(node.children) ? (node.children as JSONNode[]) : [];
+  return children.every((child) => child.type === "text" && child.text === "");
+}
+
+/**
+ * Leaves out the blank lines that a person typed: the empty paragraphs
+ * between other blocks (as `Kotoba.Nodes.Paragraph` has them), for an editor
+ * with `blank_lines={:collapse}`.
+ */
+export function collapseBlankLines(node: JSONNode): JSONNode {
+  if (!Array.isArray(node.children)) return node;
+  let children = (node.children as JSONNode[]).map(collapseBlankLines);
+  if (BLOCK_PARENTS.has(String(node.type))) {
+    const content = children.map((child) => !isEmptyParagraph(child));
+    const first = content.indexOf(true);
+    const last = content.lastIndexOf(true);
+    children = children.filter((child, index) => !(isEmptyParagraph(child) && index > first && index < last));
+  }
+  return { ...node, children };
 }
 
 // Upload markers are dropped; unknown nodes are written as they were read.

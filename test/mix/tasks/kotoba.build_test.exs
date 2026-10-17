@@ -7,7 +7,8 @@ defmodule Mix.Tasks.Kotoba.BuildTest do
   @root Path.expand("../../..", __DIR__)
   @static Path.join(@root, "priv/static")
   @files ~w(kotoba.esm.js kotoba.cjs.js kotoba-collab.esm.js kotoba-collab.cjs.js kotoba.css kotoba-sumi.css)
-  @exports ~w(AttachmentNode GalleryNode Kotoba MentionNode registerCollaboration)
+  @exports ~w(AttachmentNode FootnoteDefinitionNode FootnoteReferenceNode GalleryNode ImageNode
+              Kotoba MentionNode highlightRenderedContent registerCollaboration)
 
   @moduletag :build
   @moduletag timeout: 600_000

@@ -28,6 +28,8 @@ defmodule Kotoba.Features do
   | `tables` | tables | `table`, `tablerow`, `tablecell` |
   | `attachments` | file uploads and image galleries (with the `uploads` attribute) | `attachment`, `gallery` |
   | `mentions` | prompts and mentions (with the `prompts` attribute) | `mention` |
+  | `images` | images from a URL, as Markdown has them | `image` |
+  | `footnotes` | footnotes and their references | `footnotedefinition`, `footnotereference` |
 
   Paragraphs, line breaks, tabs, undo and redo are always there. The case
   formats (`lowercase`, `uppercase`, `capitalize`) are not features: the
@@ -74,7 +76,9 @@ defmodule Kotoba.Features do
     :horizontal_rules,
     :tables,
     :attachments,
-    :mentions
+    :mentions,
+    :images,
+    :footnotes
   ]
 
   @requires %{check_lists: :lists}
@@ -104,7 +108,10 @@ defmodule Kotoba.Features do
     Nodes.TableCell => :tables,
     Nodes.Attachment => :attachments,
     Nodes.Gallery => :attachments,
-    Nodes.Mention => :mentions
+    Nodes.Mention => :mentions,
+    Nodes.Image => :images,
+    Nodes.FootnoteReference => :footnotes,
+    Nodes.FootnoteDefinition => :footnotes
   }
 
   @typedoc "A built-in feature."
@@ -127,6 +134,8 @@ defmodule Kotoba.Features do
           | :tables
           | :attachments
           | :mentions
+          | :images
+          | :footnotes
 
   @doc """
   Returns the features, in order.
